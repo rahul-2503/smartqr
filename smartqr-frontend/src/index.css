@@ -1,0 +1,339 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════════
+   SmartQR Design System — Responsive Foundation
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ═══ CSS Custom Properties (Responsive Tokens) ═══ */
+:root {
+  /* Spacing — scales down on mobile */
+  --section-padding: 112px;
+  --page-top: 96px;
+  --page-bottom: 64px;
+  --card-padding: 32px;
+  --container-padding: 2rem;
+
+  /* Typography — fluid scaling */
+  --text-hero: clamp(2.2rem, 5vw, 3.5rem);
+  --text-h1: clamp(1.5rem, 4vw, 2rem);
+  --text-h2: clamp(1.4rem, 3.5vw, 2.5rem);
+  --text-section-title: clamp(1.75rem, 4vw, 2.75rem);
+  --text-body: clamp(0.875rem, 2vw, 1rem);
+}
+
+@media (max-width: 768px) {
+  :root {
+    --section-padding: 64px;
+    --page-top: 72px;
+    --page-bottom: 40px;
+    --card-padding: 20px;
+    --container-padding: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --section-padding: 48px;
+    --page-top: 64px;
+    --page-bottom: 32px;
+    --card-padding: 16px;
+    --container-padding: 0.875rem;
+  }
+}
+
+/* ═══ Global Reset ═══ */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #1a1a2e;
+  background-color: #ffffff;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* ═══ Container System ═══ */
+.container-main {
+  width: 100%;
+  max-width: 1140px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--container-padding);
+  padding-right: var(--container-padding);
+}
+
+@media (min-width: 1024px) {
+  .container-main {
+    padding-left: 3rem;
+    padding-right: 3rem;
+  }
+}
+
+.container-wide {
+  width: 100%;
+  max-width: 1280px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--container-padding);
+  padding-right: var(--container-padding);
+}
+
+@media (min-width: 1024px) {
+  .container-wide {
+    padding-left: 3rem;
+    padding-right: 3rem;
+  }
+}
+
+.container-narrow {
+  width: 100%;
+  max-width: 960px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--container-padding);
+  padding-right: var(--container-padding);
+}
+
+/* ═══ Responsive Grid Utilities ═══ */
+
+/* Two equal columns → stacks on mobile */
+.grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
+  align-items: center;
+}
+
+@media (max-width: 768px) {
+  .grid-2col {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+}
+
+/* Dashboard sidebar layout: main + 320px sidebar → stacks on tablet */
+.grid-sidebar {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 32px;
+}
+
+@media (max-width: 1024px) {
+  .grid-sidebar {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+
+/* Footer grid: 1.5fr 1fr 1fr 1fr → 2-col on tablet → 1-col on mobile */
+.grid-footer {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr;
+  gap: 40px;
+}
+
+@media (max-width: 768px) {
+  .grid-footer {
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+  }
+}
+
+@media (max-width: 480px) {
+  .grid-footer {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+
+/* Hero grid: 1fr 1fr → stacks on tablet */
+.grid-hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .grid-hero {
+    grid-template-columns: 1fr;
+    gap: 48px;
+  }
+}
+
+/* Reverse order on mobile (content first, visual second) */
+.grid-2col-reverse {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
+  align-items: center;
+}
+
+@media (max-width: 768px) {
+  .grid-2col-reverse {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+  .grid-2col-reverse > :first-child {
+    order: 2;
+  }
+  .grid-2col-reverse > :last-child {
+    order: 1;
+  }
+}
+
+/* Form 2-col → 1-col on mobile */
+.grid-form-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .grid-form-2col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Product info 3-col → 1fr on mobile */
+.grid-info-3col {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 480px) {
+  .grid-info-3col {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+/* ═══ Responsive Helpers ═══ */
+
+/* Hide floating decorative elements on small screens */
+@media (max-width: 900px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+/* Stack flex children vertically on mobile */
+.flex-responsive {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+@media (max-width: 480px) {
+  .flex-responsive {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* Footer bottom bar */
+.footer-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .footer-bottom {
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+  }
+}
+
+/* OCR button row on Dashboard */
+.ocr-button-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-top: 16px;
+}
+
+@media (max-width: 640px) {
+  .ocr-button-row {
+    flex-direction: column;
+  }
+}
+
+/* ═══ Scrollbar ═══ */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f8f9fa;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
+}
+
+/* ═══ Selection ═══ */
+::selection {
+  background-color: #d8f3dc;
+  color: #2d6a4f;
+}
+
+/* ═══ Focus ═══ */
+:focus-visible {
+  outline: 2px solid #2d6a4f;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ═══ Responsive Section Padding ═══ */
+.section-padding {
+  padding-top: var(--section-padding);
+  padding-bottom: var(--section-padding);
+}
+
+/* ═══ Responsive Page Padding ═══ */
+.page-padding {
+  padding-top: var(--page-top);
+  padding-bottom: var(--page-bottom);
+}
+
+/* ═══ Navbar responsive ═══ */
+.nav-desktop {
+  display: flex !important;
+}
+.nav-mobile-toggle {
+  display: none !important;
+}
+.nav-mobile-menu {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .navbar-height {
+    height: 56px !important;
+  }
+  .nav-desktop {
+    display: none !important;
+  }
+  .nav-mobile-toggle {
+    display: block !important;
+  }
+}

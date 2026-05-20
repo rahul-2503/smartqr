@@ -1,0 +1,19 @@
+[
+  {
+    "id": "jjkj",
+    "batch_id": "jjkj",
+    "product_name": "nnmnm",
+    "manufacturer": "knknkknkn",
+    "category": "nknknk",
+    "mfg_date": "2026-05-25",
+    "exp_date": "2026-05-30",
+    "instructions": "",
+    "warnings": "",
+    "created_at": "2026-05-16T05:17:17.497Z",
+    "_rid": "em8qAMDdamoDAAAAAAAAAA==",
+    "_self": "dbs/em8qAA==/colls/em8qAMDdamo=/docs/em8qAMDdamoDAAAAAAAAAA==/",
+    "_etag": "\"f3021e7e-0000-2000-0000-6a07fddd0000\"",
+    "_attachments": "attachments/",
+    "_ts": 1778908637
+  }
+]
