@@ -29,7 +29,7 @@ By giving consumers the power to verify their medicines instantly, we render cou
 
 ## 🚀 Deployment Link
 You can access the live application here:
-👉 **[Insert Deployment Link Here]**
+👉 **https://lemon-bay-056bf6a00.7.azurestaticapps.net/**
 
 *(Once deployed via Azure Static Web Apps, update this section with your `.azurestaticapps.net` or custom domain URL).*
 
