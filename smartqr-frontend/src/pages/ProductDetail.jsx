@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getBatchById } from '../api/manufacturerApi';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -23,6 +23,45 @@ const formatDateForSpeech = (dateStr, lang) => {
   }
 };
 
+const getBestVoice = (lang, speechLang) => {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return null;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices || voices.length === 0) return null;
+
+  const cleanLang = lang.toLowerCase().trim();
+  const cleanSpeechLang = speechLang.toLowerCase().replace('_', '-').trim();
+  const norm = (l) => l.toLowerCase().replace('_', '-').trim();
+
+  // 1. Try exact speechLang match (e.g. hi-in)
+  let voice = voices.find(v => norm(v.lang) === cleanSpeechLang);
+  if (voice) return voice;
+
+  // 2. Try match on lang prefix (e.g. hi)
+  voice = voices.find(v => norm(v.lang).startsWith(cleanLang));
+  if (voice) return voice;
+
+  // 3. Try match where language code contains language code
+  voice = voices.find(v => norm(v.lang).includes(cleanLang));
+  if (voice) return voice;
+
+  // 4. Try matching voice name case-insensitively using language-specific keywords
+  const langNameMap = {
+    hi: ['hindi', 'हिन्दी', 'hi-'],
+    te: ['telugu', 'తెలుగు', 'te-'],
+    kn: ['kannada', 'ಕನ್ನಡ', 'kn-'],
+    en: ['english', 'en-']
+  };
+
+  const keywords = langNameMap[cleanLang] || [cleanLang];
+  voice = voices.find(v => {
+    const name = v.name.toLowerCase();
+    const vlang = norm(v.lang);
+    return keywords.some(kw => name.includes(kw) || vlang.includes(kw));
+  });
+
+  return voice || null;
+};
+
 export default function ProductDetail() {
   const { t, speechLang, lang } = useLanguage();
 
@@ -33,9 +72,26 @@ export default function ProductDetail() {
   };
 
   const { batchId } = useParams();
+  const [searchParams] = useSearchParams();
+  const cellScanned = searchParams.get('cell');
+  const stripScanned = searchParams.get('strip');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Pre-load voices on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.getVoices();
+      const handleVoices = () => {
+        window.speechSynthesis.getVoices();
+      };
+      window.speechSynthesis.addEventListener('voiceschanged', handleVoices);
+      return () => {
+        window.speechSynthesis.removeEventListener('voiceschanged', handleVoices);
+      };
+    }
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -105,14 +161,7 @@ export default function ProductDetail() {
     const u = new SpeechSynthesisUtterance(text);
     u.lang = speechLang;
     
-    const voices = window.speechSynthesis.getVoices();
-    let voice = voices.find(v => v.lang === speechLang);
-    if (!voice) {
-      voice = voices.find(v => v.lang.startsWith(lang));
-    }
-    if (!voice) {
-      voice = voices.find(v => v.lang.toLowerCase().includes(lang.toLowerCase()));
-    }
+    const voice = getBestVoice(lang, speechLang);
     if (voice) {
       u.voice = voice;
     }
@@ -195,6 +244,12 @@ export default function ProductDetail() {
                 </div>
               ))}
             </div>
+
+            {cellScanned && stripScanned && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', background: '#f8fafc', color: '#334155', borderRadius: 12, fontSize: 13, fontWeight: 600, border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                {t('scanner.tablet')} {cellScanned} {t('scanner.ofStrip')} {stripScanned}
+              </div>
+            )}
 
             <div style={{ ...infoBox, padding: 24 }}>
               <p style={{ fontSize: 10, color: '#a0aec0', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>

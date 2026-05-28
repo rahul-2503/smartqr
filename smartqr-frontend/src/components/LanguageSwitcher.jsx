@@ -10,21 +10,55 @@ const languages = [
   { code: 'kn', label: 'ಕನ್ನಡ', flag: '🇮🇳' },
 ];
 
-export default function LanguageSwitcher() {
+export default function LanguageSwitcher({ inline = false }) {
   const { lang, setLanguage } = useLanguage();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
   // Close on outside click
   useEffect(() => {
+    if (inline) return;
     const handler = (e) => {
       if (ref.current && !ref.current.contains(e.target)) setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, []);
+  }, [inline]);
 
   const current = languages.find((l) => l.code === lang) || languages[0];
+
+  if (inline) {
+    return (
+      <div id="language-switcher" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+        {languages.map((l) => (
+          <button
+            key={l.code}
+            id={`lang-option-${l.code}`}
+            onClick={() => setLanguage(l.code)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 12px',
+              borderRadius: '10px',
+              border: '1px solid',
+              borderColor: lang === l.code ? '#2d6a4f' : '#e4e4e7',
+              background: lang === l.code ? '#f0fdf4' : '#ffffff',
+              color: lang === l.code ? '#2d6a4f' : '#3f3f46',
+              fontSize: '13px',
+              fontWeight: lang === l.code ? 700 : 500,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              transition: 'all 0.2s',
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>{l.flag}</span>
+            <span>{l.label}</span>
+          </button>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>

@@ -127,7 +127,7 @@ export default function Navbar() {
                 </Link>
               ))}
               <div style={{ padding: '12px 16px' }}>
-                <LanguageSwitcher />
+                <LanguageSwitcher inline={true} />
               </div>
             </div>
           </motion.div>

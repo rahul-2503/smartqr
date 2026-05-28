@@ -5,6 +5,7 @@ import Tesseract from 'tesseract.js';
 import jsQR from 'jsqr';
 import { getProductByBarcode } from '../api/products';
 import { useLanguage } from '../i18n/LanguageContext';
+import { useNavigate } from 'react-router-dom';
 import { 
   HiOutlineQrCode, HiOutlineExclamationTriangle, HiOutlineXMark, 
   HiOutlineShieldCheck, HiOutlineClock, HiOutlineCamera, HiOutlineCheckBadge, HiOutlineSpeakerWave,
@@ -34,6 +35,7 @@ const getStatusForDays = (daysLeft) => {
 
 export default function Scanner() {
   const { t, speechLang, lang } = useLanguage();
+  const navigate = useNavigate();
   const STATUS = getStatus(t);
   const [step, setStep] = useState('BARCODE'); // 'BARCODE', 'PRODUCT_FOUND', 'RESULT'
   const [product, setProduct] = useState(null);
@@ -281,24 +283,11 @@ export default function Scanner() {
           throw new Error('Invalid QR data format.');
         }
         
-        const res = await fetch(`https://smartqr-api-rahul-f8hpaqeudbdeesa5.centralindia-01.azurewebsites.net/api/getbatch/${qrData.bid}`);
-        
-        // Safe JSON parse
-        let data;
-        try {
-          const text = await res.text();
-          data = text ? JSON.parse(text) : {};
-        } catch (parseErr) {
-          throw new Error(`Server returned invalid response (${res.status}).`);
+        if (qrData.cell && qrData.strip) {
+          navigate(`/scan/${qrData.bid}?cell=${qrData.cell}&strip=${qrData.strip}`);
+        } else {
+          navigate(`/scan/${qrData.bid}`);
         }
-        
-        if (!res.ok) throw new Error(data.error || "Batch not found");
-        
-        setProduct(data.product);
-        const dL = calculateDaysLeft(data.batch.exp_date);
-        const stDays = getStatusForDays(dL);
-        setResolvedBatch({ ...data.batch, days_left: dL, status: stDays, cellScanned: qrData.cell, stripScanned: qrData.strip });
-        setStep('RESULT');
         return;
       }
 
@@ -315,21 +304,7 @@ export default function Scanner() {
       }
 
       if (batchIdFromUrl) {
-        const res = await fetch(`https://smartqr-api-rahul-f8hpaqeudbdeesa5.centralindia-01.azurewebsites.net/api/getbatch/${batchIdFromUrl}`);
-        let data;
-        try {
-          const text = await res.text();
-          data = text ? JSON.parse(text) : {};
-        } catch (parseErr) {
-          throw new Error(`Server returned invalid response (${res.status}).`);
-        }
-        if (!res.ok) throw new Error(data.error || "Batch not found");
-        
-        setProduct(data.product);
-        const dL = calculateDaysLeft(data.batch.exp_date);
-        const stDays = getStatusForDays(dL);
-        setResolvedBatch({ ...data.batch, days_left: dL, status: stDays });
-        setStep('RESULT');
+        navigate(`/scan/${batchIdFromUrl}`);
         return;
       }
 
@@ -539,10 +514,7 @@ export default function Scanner() {
       }
     }
 
-    const dL = calculateDaysLeft(matchedBatch.exp_date);
-    const stDays = getStatusForDays(dL);
-    setResolvedBatch({ ...matchedBatch, days_left: dL, status: stDays });
-    setStep('RESULT');
+    navigate(`/scan/${matchedBatch.batch_id}`);
   };
 
   const resetAll = () => {
