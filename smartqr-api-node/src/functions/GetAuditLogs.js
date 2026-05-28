@@ -9,37 +9,31 @@ app.http('GetAuditLogs', {
         try {
             // Enterprise Authentication
             const authHeader = request.headers.get('authorization');
-            let decodedToken;
+            let authUser;
             try {
-                decodedToken = await verifyToken(authHeader);
+                authUser = await verifyToken(authHeader);
             } catch (authErr) {
-                return { status: 401, body: JSON.stringify({ error: "Unauthorized: " + authErr.message }) };
+                return { status: 401, jsonBody: { error: "Unauthorized: " + authErr.message } };
             }
-            
-            const organizationId = decodedToken.uid || decodedToken.sub;
 
+            const organizationDomain = authUser.organizationDomain;
             const { auditLogs } = await getContainers();
 
             // Fetch logs for this organization, sorted by timestamp descending
             const querySpec = {
-                query: "SELECT * FROM c WHERE c.organizationId = @orgId ORDER BY c.timestamp DESC OFFSET 0 LIMIT 50",
-                parameters: [{ name: "@orgId", value: organizationId }]
+                query: "SELECT * FROM c WHERE c.organizationDomain = @org ORDER BY c.timestamp DESC OFFSET 0 LIMIT 50",
+                parameters: [{ name: "@org", value: organizationDomain }]
             };
 
             const { resources } = await auditLogs.items.query(querySpec).fetchAll();
 
             return {
                 status: 200,
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ logs: resources })
+                jsonBody: { logs: resources }
             };
         } catch (err) {
             context.error(err);
-            return {
-                status: 500,
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ error: "Internal server error" })
-            };
+            return { status: 500, jsonBody: { error: "Internal server error" } };
         }
     }
 });

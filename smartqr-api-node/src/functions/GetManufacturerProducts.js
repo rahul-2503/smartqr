@@ -1,34 +1,40 @@
 const { app } = require('@azure/functions');
 const { getContainers } = require('../db');
+const { verifyToken } = require('../utils/auth');
 
 app.http('GetManufacturerProducts', {
     methods: ['GET'],
     authLevel: 'anonymous',
-    route: 'getmanufacturerproducts/{mfrId}',
+    route: 'getManufacturerProducts',
     handler: async (request, context) => {
         try {
-            const mfrId = request.params.mfrId;
-            if (!mfrId) {
-                return { status: 400, body: JSON.stringify({ error: "Manufacturer ID is required" }) };
+            // Enterprise Authentication — org derived from token, not URL param
+            const authHeader = request.headers.get('authorization');
+            let authUser;
+            try {
+                authUser = await verifyToken(authHeader);
+            } catch (authErr) {
+                return { status: 401, jsonBody: { error: "Unauthorized: " + authErr.message } };
             }
 
+            const orgDomain = authUser.organizationDomain;
             const { medicineProducts, smartBatches } = await getContainers();
 
-            // Query Products
+            // Query Products for this organization
             const productQuery = {
-                query: "SELECT * FROM c WHERE c.mfr_id = @mfrId",
-                parameters: [{ name: "@mfrId", value: mfrId }]
+                query: "SELECT * FROM c WHERE c.organizationDomain = @org ORDER BY c.registered_at DESC",
+                parameters: [{ name: "@org", value: orgDomain }]
             };
             const { resources: products } = await medicineProducts.items.query(productQuery).fetchAll();
 
-            // Query Batches
+            // Query Batches for this organization
             const batchQuery = {
-                query: "SELECT * FROM c WHERE c.mfr_id = @mfrId",
-                parameters: [{ name: "@mfrId", value: mfrId }]
+                query: "SELECT * FROM c WHERE c.organizationDomain = @org ORDER BY c.registered_at DESC",
+                parameters: [{ name: "@org", value: orgDomain }]
             };
             const { resources: batches } = await smartBatches.items.query(batchQuery).fetchAll();
 
-            // Add status to batches
+            // Add expiry status to batches
             const today = new Date();
             const processedBatches = batches.map(b => {
                 const expDate = new Date(b.exp_date);
@@ -38,20 +44,23 @@ app.http('GetManufacturerProducts', {
                 if (diffDays < 0) status = 'EXPIRED';
                 else if (diffDays <= 90) status = 'EXPIRING_SOON';
                 
-                return { ...b, status };
+                return { ...b, status, days_left: diffDays };
             });
 
             return {
                 status: 200,
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ 
+                jsonBody: { 
                     products,
-                    batches: processedBatches
-                })
+                    batches: processedBatches,
+                    organization: {
+                        domain: orgDomain,
+                        name: authUser.organizationName
+                    }
+                }
             };
         } catch (err) {
             context.error(err);
-            return { status: 500, body: JSON.stringify({ error: "Internal server error" }) };
+            return { status: 500, jsonBody: { error: "Internal server error" } };
         }
     }
 });

@@ -1,5 +1,6 @@
 const { app } = require('@azure/functions');
 const { getContainers } = require('../db');
+const { verifyToken } = require('../utils/auth');
 
 app.http('RegisterProduct', {
     methods: ['POST'],
@@ -7,23 +8,39 @@ app.http('RegisterProduct', {
     route: 'registerProduct',
     handler: async (request, context) => {
         try {
+            // Enterprise Authentication
+            const authHeader = request.headers.get('authorization');
+            let authUser;
+            try {
+                authUser = await verifyToken(authHeader);
+            } catch (authErr) {
+                return { status: 401, jsonBody: { error: "Unauthorized: " + authErr.message } };
+            }
+
+            if (!authUser.isBusinessEmail) {
+                return { status: 403, jsonBody: { error: "Business email required." } };
+            }
+
             const data = await request.json();
-            const required = ["mfrId", "medicineName", "genericName", "dosage", "type", "category", "composition", "storage", "dosageInstructions"];
+            const required = ["medicineName", "genericName", "dosage", "type", "category", "composition", "storage", "dosageInstructions"];
 
             for (const field of required) {
                 if (!data[field]) {
-                    return { status: 400, body: JSON.stringify({ error: `Missing field: ${field}` }) };
+                    return { status: 400, jsonBody: { error: `Missing field: ${field}` } };
                 }
             }
 
-            const { medicineProducts } = await getContainers();
+            const { medicineProducts, auditLogs } = await getContainers();
 
-            const productId = `PRD-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+            const productId = `PRD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
             const item = {
                 id: productId,
                 product_id: productId,
-                mfr_id: data.mfrId,
+                organizationDomain: authUser.organizationDomain,
+                organizationName: authUser.organizationName,
+                createdByUid: authUser.uid,
+                createdByEmail: authUser.email,
                 medicine_name: data.medicineName,
                 generic_name: data.genericName,
                 dosage: data.dosage,
@@ -40,14 +57,25 @@ app.http('RegisterProduct', {
 
             await medicineProducts.items.upsert(item);
 
+            // Audit Trail
+            await auditLogs.items.create({
+                id: `audit-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`,
+                organizationDomain: authUser.organizationDomain,
+                action: "REGISTER_PRODUCT",
+                actor: authUser.email,
+                details: `Registered product: ${data.medicineName} (${data.dosage})`,
+                entityId: productId,
+                entityType: "product",
+                timestamp: new Date().toISOString()
+            });
+
             return {
                 status: 201,
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: "Product registered successfully!", productId })
+                jsonBody: { message: "Product registered successfully!", productId }
             };
         } catch (err) {
             context.error(err);
-            return { status: 500, body: JSON.stringify({ error: "Internal server error" }) };
+            return { status: 500, jsonBody: { error: "Internal server error" } };
         }
     }
 });

@@ -18,39 +18,78 @@ app.http('GetBatch', {
     route: 'getbatch/{batchId}',
     handler: async (request, context) => {
         try {
-            const batchId = request.params.batchId;
+            const batchId = decodeURIComponent(request.params.batchId);
             if (!batchId) {
                 return { status: 400, body: JSON.stringify({ error: "Batch ID is required" }) };
             }
 
-            const { smartBatches, medicineProducts, manufacturers } = await getContainers();
+            const { smartBatches, medicineProducts, manufacturers, organizations } = await getContainers();
 
-            // Query the batch across partitions (since partitionKey is mfr_id)
-            const batchQuery = {
-                query: "SELECT * FROM c WHERE c.batch_id = @batchId",
-                parameters: [{ name: "@batchId", value: batchId }]
-            };
-            const { resources: batchResults } = await smartBatches.items.query(batchQuery).fetchAll();
-            
-            if (batchResults.length === 0) {
-                return { status: 404, body: JSON.stringify({ error: "Batch not found" }) };
+            let batch = null;
+
+            // Strategy 1: If batchId contains '_', it's a composite ID (orgDomain_batchNo)
+            // Try a precise point-read first (much faster and always returns the correct batch)
+            if (batchId.includes('_')) {
+                const underscoreIdx = batchId.indexOf('_');
+                const orgDomain = batchId.substring(0, underscoreIdx);
+                try {
+                    const { resource } = await smartBatches.item(batchId, orgDomain).read();
+                    if (resource) batch = resource;
+                } catch (err) {
+                    // Point read failed, fall through to query
+                    context.log("Point read failed for", batchId, "- trying cross-partition query");
+                }
             }
-            
-            const batch = batchResults[0];
+
+            // Strategy 2: Fallback — cross-partition query by batch_id (for old QR codes)
+            if (!batch) {
+                const batchQuery = {
+                    query: "SELECT * FROM c WHERE c.batch_id = @batchId OR c.id = @batchId",
+                    parameters: [{ name: "@batchId", value: batchId }]
+                };
+                const { resources: batchResults } = await smartBatches.items.query(batchQuery).fetchAll();
+                
+                if (batchResults.length === 0) {
+                    return { status: 404, body: JSON.stringify({ error: "Batch not found" }) };
+                }
+                
+                batch = batchResults[0];
+            }
+
             batch.status = getStatusFromExpiry(batch.exp_date);
 
             // Get Product
             let product = null;
-            if (batch.product_id && batch.mfr_id) {
-                const { resource: p } = await medicineProducts.item(batch.product_id, batch.mfr_id).read();
-                product = p;
+            const orgDomain = batch.organizationDomain || batch.mfr_id;
+            if (batch.product_id && orgDomain) {
+                try {
+                    const { resource: p } = await medicineProducts.item(batch.product_id, orgDomain).read();
+                    product = p;
+                } catch (err) {
+                    context.error("Error reading product:", err);
+                }
             }
 
-            // Get Manufacturer
+            // Get Manufacturer / Organization
             let manufacturer = null;
-            if (batch.mfr_id) {
-                const { resource: m } = await manufacturers.item(batch.mfr_id, batch.mfr_id).read();
-                manufacturer = m;
+            if (orgDomain) {
+                try {
+                    const { resource: org } = await organizations.item(orgDomain, orgDomain).read();
+                    if (org) {
+                        manufacturer = {
+                            mfr_id: org.domain,
+                            companyName: org.name,
+                            address: org.address,
+                            contactEmail: org.contactEmail,
+                            contactPhone: org.contactPhone
+                        };
+                    } else {
+                        const { resource: m } = await manufacturers.item(orgDomain, orgDomain).read();
+                        manufacturer = m;
+                    }
+                } catch (err) {
+                    context.error("Error reading manufacturer:", err);
+                }
             }
 
             return {

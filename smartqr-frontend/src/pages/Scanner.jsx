@@ -2,10 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Html5Qrcode } from 'html5-qrcode';
 import Tesseract from 'tesseract.js';
+import jsQR from 'jsqr';
 import { getProductByBarcode } from '../api/products';
 import { 
   HiOutlineQrCode, HiOutlineExclamationTriangle, HiOutlineXMark, 
-  HiOutlineShieldCheck, HiOutlineClock, HiOutlineCamera, HiOutlineCheckBadge, HiOutlineSpeakerWave
+  HiOutlineShieldCheck, HiOutlineClock, HiOutlineCamera, HiOutlineCheckBadge, HiOutlineSpeakerWave,
+  HiOutlineArrowUpTray
 } from 'react-icons/hi2';
 
 const STATUS = {
@@ -28,6 +30,9 @@ export default function Scanner() {
   const [ocrText, setOcrText] = useState('');
   const [isOcrProcessing, setIsOcrProcessing] = useState(false);
   
+  // Gallery upload state
+  const [isUploadProcessing, setIsUploadProcessing] = useState(false);
+  
   // New OCR Camera Management State
   const [ocrCameras, setOcrCameras] = useState([]);
   const [ocrSelectedCamera, setOcrSelectedCamera] = useState('');
@@ -37,6 +42,7 @@ export default function Scanner() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const ocrStreamRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // --- Step 1: Barcode Scanner ---
   const startBarcodeScanner = async () => {
@@ -85,12 +91,189 @@ export default function Scanner() {
     setScanning(false);
   };
 
+  // --- Gallery Upload Handler ---
+  const handleGalleryUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadProcessing(true);
+    setError(null);
+
+    // Debug log - shown in error message so user can screenshot for diagnosis
+    const debugLog = [];
+    const log = (msg) => { debugLog.push(msg); console.log('[Scanner]', msg); };
+
+    log(`File:${(file.size/1024).toFixed(0)}KB,${file.type}`);
+
+    // Helper: load file as Image via createObjectURL (much more memory efficient than readAsDataURL)
+    const loadImageObj = (f) => {
+      return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(f);
+        const img = new Image();
+        img.onload = () => resolve({ img, url });
+        img.onerror = (err) => { URL.revokeObjectURL(url); reject(err); };
+        img.src = url;
+      });
+    };
+
+    // Helper: convert canvas to a JPEG File object
+    const canvasToFile = (canvas, filename) => {
+      return new Promise((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if (blob) resolve(new File([blob], filename, { type: 'image/jpeg' }));
+          else reject(new Error('toBlob null'));
+        }, 'image/jpeg', 0.85);
+      });
+    };
+
+    let objectUrl = null;
+
+    try {
+      // Load image — try createImageBitmap first (handles EXIF orientation, very memory efficient)
+      let img;
+      try {
+        if (typeof createImageBitmap === 'function') {
+          img = await createImageBitmap(file);
+          log(`Bmp:${img.width}x${img.height}`);
+        } else {
+          throw new Error('noBmp');
+        }
+      } catch (bmpErr) {
+        log(`Bmp:${bmpErr.message}`);
+        const loaded = await loadImageObj(file);
+        img = loaded.img;
+        objectUrl = loaded.url;
+        log(`Img:${img.width}x${img.height}`);
+      }
+
+      if (!img.width || !img.height) {
+        throw new Error(`BadDim:${img.width}x${img.height}`);
+      }
+
+      let result = null;
+
+      // 1. Try Native BarcodeDetector
+      if ('BarcodeDetector' in window) {
+        try {
+          const bd = new window.BarcodeDetector({
+            formats: ['qr_code', 'ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e']
+          });
+          const barcodes = await bd.detect(img);
+          if (barcodes && barcodes.length > 0) {
+            result = barcodes[0].rawValue;
+            log(`BD:${result}`);
+          } else {
+            log('BD:0');
+          }
+        } catch (err) {
+          log(`BD:${err.message}`);
+        }
+      } else {
+        log('BD:N/A');
+      }
+
+      // Store canvases for html5-qrcode fallback
+      const scaledCanvases = [];
+      const targetDims = [1600, 1200, 800, 600];
+
+      // 2. Try jsQR across multiple scales (QR codes only)
+      if (!result) {
+        for (const maxDim of targetDims) {
+          if (img.width <= maxDim && img.height <= maxDim && maxDim !== targetDims[0]) continue;
+
+          try {
+            let w = img.width, h = img.height;
+            if (w > maxDim || h > maxDim) {
+              if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+              else { w = Math.round((w * maxDim) / h); h = maxDim; }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) { log(`jQ@${maxDim}:noctx`); continue; }
+            ctx.drawImage(img, 0, 0, w, h);
+            scaledCanvases.push({ canvas, maxDim });
+
+            const imageData = ctx.getImageData(0, 0, w, h);
+            const qr = jsQR(imageData.data, w, h, { inversionAttempts: 'attemptBoth' });
+            if (qr) { result = qr.data; log(`jQ@${maxDim}:${result}`); break; }
+            else { log(`jQ@${maxDim}:-`); }
+          } catch (err) {
+            log(`jQ@${maxDim}:${err.message}`);
+          }
+        }
+      }
+
+      // 3. Try html5-qrcode (ZXing) - supports QR AND 1D barcodes
+      if (!result) {
+        // Prepare scan attempts: resized blobs first (mobile-safe), then original
+        const scanAttempts = [];
+        for (const { canvas, maxDim } of scaledCanvases) {
+          try {
+            const f2 = await canvasToFile(canvas, `s${maxDim}.jpg`);
+            scanAttempts.push({ file: f2, label: `r${maxDim}` });
+          } catch (err) { log(`blob@${maxDim}:${err.message}`); }
+        }
+        scanAttempts.push({ file, label: 'orig' });
+
+        for (const attempt of scanAttempts) {
+          let h5 = null;
+          try {
+            h5 = new Html5Qrcode('qr-reader-hidden');
+            result = await h5.scanFile(attempt.file, false);
+            log(`h5(${attempt.label}):${result}`);
+            try { await h5.clear(); } catch {}
+            break;
+          } catch (err) {
+            log(`h5(${attempt.label}):-`);
+            if (h5) { try { await h5.clear(); } catch {} }
+          }
+        }
+      }
+
+      // Cleanup
+      if (img.close) img.close();
+      if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
+
+      if (result) {
+        handleLookupProduct(result);
+      } else {
+        throw new Error('All methods failed');
+      }
+    } catch (err) {
+      console.error('Gallery scan failed:', err);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      setError(`Scan failed. Debug: ${debugLog.join(' | ')}`);
+      setTimeout(() => setError(null), 30000);
+    } finally {
+      setIsUploadProcessing(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const handleLookupProduct = async (decodedText) => {
     try {
+      // Check if it's a SmartQR JSON-encoded QR code
       if (decodedText.startsWith('{') && decodedText.includes('"bid"')) {
-        const qrData = JSON.parse(decodedText);
-        const res = await fetch(`/api/getbatch/${qrData.bid}`);
-        const data = await res.json();
+        let qrData;
+        try {
+          qrData = JSON.parse(decodedText);
+        } catch (parseErr) {
+          throw new Error('Invalid QR data format.');
+        }
+        
+        const res = await fetch(`https://smartqr-api-rahul-f8hpaqeudbdeesa5.centralindia-01.azurewebsites.net/api/getbatch/${qrData.bid}`);
+        
+        // Safe JSON parse
+        let data;
+        try {
+          const text = await res.text();
+          data = text ? JSON.parse(text) : {};
+        } catch (parseErr) {
+          throw new Error(`Server returned invalid response (${res.status}).`);
+        }
+        
         if (!res.ok) throw new Error(data.error || "Batch not found");
         
         setProduct(data.product);
@@ -99,6 +282,36 @@ export default function Scanner() {
         return;
       }
 
+      // Check if it's a SmartQR URL (e.g., https://lemon-bay-xxx.azurestaticapps.net/scan/BATCH123)
+      let batchIdFromUrl = null;
+      try {
+        const url = new URL(decodedText);
+        const pathParts = url.pathname.split('/').filter(Boolean);
+        if (pathParts.length >= 2 && (pathParts[0] === 'scan' || pathParts[0] === 'product')) {
+          batchIdFromUrl = pathParts[1];
+        }
+      } catch {
+        // Not a URL, continue with barcode lookup
+      }
+
+      if (batchIdFromUrl) {
+        const res = await fetch(`https://smartqr-api-rahul-f8hpaqeudbdeesa5.centralindia-01.azurewebsites.net/api/getbatch/${batchIdFromUrl}`);
+        let data;
+        try {
+          const text = await res.text();
+          data = text ? JSON.parse(text) : {};
+        } catch (parseErr) {
+          throw new Error(`Server returned invalid response (${res.status}).`);
+        }
+        if (!res.ok) throw new Error(data.error || "Batch not found");
+        
+        setProduct(data.product);
+        setResolvedBatch(data.batch);
+        setStep('RESULT');
+        return;
+      }
+
+      // Standard barcode lookup
       const data = await getProductByBarcode(decodedText);
       setProduct(data.product);
       setBatches(data.batches || []);
@@ -112,7 +325,7 @@ export default function Scanner() {
   const readAloud = () => {
     if (!product || !resolvedBatch) return;
     const isExpired = resolvedBatch.status === 'EXPIRED';
-    let text = `${product.medicine_name}, ${product.dosage}. `;
+    let text = `${product.medicine_name || product.product_name || resolvedBatch.product_name || ''}, ${product.dosage || ''}. `;
     if (isExpired) {
       text += "Warning! This product has expired. Do not consume. ";
     } else {
@@ -297,8 +510,32 @@ export default function Scanner() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
           style={{ textAlign: 'center', marginBottom: 32 }}>
           <h1 style={{ fontSize: 32, fontWeight: 800, color: '#1a1a2e', letterSpacing: '-0.02em' }}>Scan Product</h1>
-          <p style={{ marginTop: 8, fontSize: 16, color: '#718096' }}>Scan a retail barcode to instantly check its safety and expiry status.</p>
+          <p style={{ marginTop: 8, fontSize: 16, color: '#718096' }}>Scan a QR code or barcode to instantly check safety and expiry status.</p>
         </motion.div>
+
+        {/* Hidden div for gallery QR scanning */}
+        <div 
+          id="qr-reader-hidden" 
+          style={{ 
+            position: 'absolute', 
+            top: '-9999px', 
+            left: '-9999px', 
+            width: '250px', 
+            height: '250px', 
+            overflow: 'hidden', 
+            opacity: 0 
+          }}
+        ></div>
+
+        {/* Hidden file input for gallery upload */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleGalleryUpload}
+          style={{ display: 'none' }}
+          id="gallery-upload-input"
+        />
 
         <AnimatePresence mode="wait">
           {/* STEP 1: BARCODE SCANNER */}
@@ -307,22 +544,78 @@ export default function Scanner() {
               style={{ background: 'white', borderRadius: 24, border: '1px solid #f1f3f5', padding: 24, boxShadow: '0 24px 80px rgba(0,0,0,0.05)' }}>
               
               {!scanning ? (
-                <div style={{ textAlign: 'center', padding: '48px 24px' }}>
-                  <div style={{ width: 80, height: 80, margin: '0 auto 24px', background: '#f8f9fa', borderRadius: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ textAlign: 'center', padding: '40px 24px' }}>
+                  <div style={{ width: 80, height: 80, margin: '0 auto 24px', background: '#f0fdf4', borderRadius: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <HiOutlineQrCode style={{ width: 40, height: 40, color: '#2d6a4f' }} />
                   </div>
                   <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1a1a2e', marginBottom: 8 }}>Ready to scan</h2>
-                  <p style={{ color: '#718096', marginBottom: 32 }}>Hold your phone steady and point the camera at the 1D retail barcode.</p>
-                  <button onClick={startBarcodeScanner} style={{ width: '100%', padding: '16px', background: '#2d6a4f', color: 'white', fontWeight: 600, borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 16, boxShadow: '0 4px 12px rgba(45,106,79,0.2)' }}>
-                    Open Camera
-                  </button>
+                  <p style={{ color: '#718096', marginBottom: 32, fontSize: 14, lineHeight: 1.6 }}>
+                    Scan a QR code using your camera or upload an image from your gallery.
+                  </p>
+
+                  {/* Single unified action buttons */}
+                  <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+                    <button 
+                      onClick={startBarcodeScanner} 
+                      disabled={isUploadProcessing}
+                      style={{ 
+                        flex: 1, padding: '16px', background: '#2d6a4f', color: 'white', fontWeight: 600, 
+                        borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 15, 
+                        boxShadow: '0 4px 16px rgba(45,106,79,0.25)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                        transition: 'all 0.2s ease',
+                        fontFamily: 'inherit'
+                      }}
+                    >
+                      <HiOutlineCamera style={{ width: 20, height: 20 }} />
+                      Open Camera
+                    </button>
+                    <button 
+                      onClick={() => fileInputRef.current?.click()} 
+                      disabled={isUploadProcessing}
+                      style={{ 
+                        flex: 1, padding: '16px', background: '#f0f9ff', color: '#0369a1', fontWeight: 600, 
+                        borderRadius: 16, border: '1.5px solid #bae6fd', cursor: 'pointer', fontSize: 15,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                        transition: 'all 0.2s ease',
+                        fontFamily: 'inherit'
+                      }}
+                    >
+                      <HiOutlineArrowUpTray style={{ width: 20, height: 20 }} />
+                      Upload Image
+                    </button>
+                  </div>
+
+                  {/* Upload processing indicator */}
+                  <AnimatePresence>
+                    {isUploadProcessing && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        style={{ marginTop: 8 }}
+                      >
+                        <div style={{ 
+                          padding: '16px', background: '#f0f9ff', borderRadius: 12, 
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                          border: '1px solid #bae6fd'
+                        }}>
+                          <div style={{ 
+                            width: 20, height: 20, border: '2.5px solid #bae6fd', borderTopColor: '#0369a1', 
+                            borderRadius: '50%', animation: 'spin 0.8s linear infinite' 
+                          }} />
+                          <span style={{ fontSize: 14, color: '#0369a1', fontWeight: 500 }}>Scanning image for QR codes...</span>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               ) : (
                 <div>
                   <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 16, background: 'black' }}>
                     <div id="qr-reader" style={{ width: '100%', border: 'none' }}></div>
                   </div>
-                  <button onClick={stopBarcodeScanner} style={{ width: '100%', padding: '16px', background: '#f8f9fa', color: '#1a1a2e', fontWeight: 600, borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 16, marginTop: 16 }}>
+                  <button onClick={stopBarcodeScanner} style={{ width: '100%', padding: '16px', background: '#f8f9fa', color: '#1a1a2e', fontWeight: 600, borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 16, marginTop: 16, fontFamily: 'inherit' }}>
                     Cancel
                   </button>
                 </div>
@@ -335,9 +628,13 @@ export default function Scanner() {
               )}
 
               {error && (
-                <div style={{ marginTop: 16, padding: 16, background: '#fef2f2', color: '#991b1b', borderRadius: 12, fontSize: 14 }}>
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  style={{ marginTop: 16, padding: 16, background: '#fef2f2', color: '#991b1b', borderRadius: 12, fontSize: 14, border: '1px solid #fecaca' }}
+                >
                   {error}
-                </div>
+                </motion.div>
               )}
             </motion.div>
           )}
@@ -363,8 +660,8 @@ export default function Scanner() {
                   
                   <div style={{ marginBottom: 24 }}>
                     <input type="text" value={ocrText} onChange={e => setOcrText(e.target.value)} placeholder="e.g. BATCH001 or EXP 05/27"
-                      style={{ width: '100%', padding: '16px', background: '#f8f9fa', border: '2px solid #e2e8f0', borderRadius: 12, fontSize: 16, color: '#1a1a2e', outline: 'none', marginBottom: 12 }} />
-                    <button onClick={startOcrCamera} style={{ width: '100%', padding: '16px', background: '#e2e8f0', color: '#1a1a2e', fontWeight: 600, borderRadius: 12, border: 'none', cursor: 'pointer', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                      style={{ width: '100%', padding: '16px', background: '#f8f9fa', border: '2px solid #e2e8f0', borderRadius: 12, fontSize: 16, color: '#1a1a2e', outline: 'none', marginBottom: 12, fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                    <button onClick={startOcrCamera} style={{ width: '100%', padding: '16px', background: '#e2e8f0', color: '#1a1a2e', fontWeight: 600, borderRadius: 12, border: 'none', cursor: 'pointer', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit' }}>
                       <HiOutlineCamera style={{ width: 20, height: 20 }} /> Scan Text via Camera
                     </button>
                   </div>
@@ -372,7 +669,7 @@ export default function Scanner() {
                   {isOcrProcessing && <p style={{ textAlign: 'center', color: '#718096', marginBottom: 16 }}>Extracting text... please wait.</p>}
 
                   <div style={{ display: 'flex', gap: 12 }}>
-                    <button onClick={resolveBatch} disabled={!ocrText} style={{ flex: 1, padding: '16px', background: '#2d6a4f', color: 'white', fontWeight: 600, borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 16, opacity: ocrText ? 1 : 0.5 }}>
+                    <button onClick={resolveBatch} disabled={!ocrText} style={{ flex: 1, padding: '16px', background: '#2d6a4f', color: 'white', fontWeight: 600, borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 16, opacity: ocrText ? 1 : 0.5, fontFamily: 'inherit' }}>
                       Verify Status
                     </button>
                     <button onClick={resetAll} style={{ padding: '16px', background: '#fef2f2', color: '#dc2626', borderRadius: 16, border: 'none', cursor: 'pointer' }}>
@@ -392,10 +689,10 @@ export default function Scanner() {
                   
                   <canvas ref={canvasRef} style={{ display: 'none' }} />
                   <div style={{ display: 'flex', gap: 12 }}>
-                    <button onClick={captureOcr} disabled={isOcrProcessing || ocrLoading} style={{ flex: 1, padding: '16px', background: '#2d6a4f', color: 'white', fontWeight: 600, borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 16, transition: 'background 0.2s' }}>
+                    <button onClick={captureOcr} disabled={isOcrProcessing || ocrLoading} style={{ flex: 1, padding: '16px', background: '#2d6a4f', color: 'white', fontWeight: 600, borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 16, transition: 'background 0.2s', fontFamily: 'inherit' }}>
                       {isOcrProcessing ? 'Extracting...' : 'Snap Photo'}
                     </button>
-                    <button onClick={stopOcrCamera} style={{ padding: '16px', background: '#f8f9fa', color: '#1a1a2e', borderRadius: 16, border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+                    <button onClick={stopOcrCamera} style={{ padding: '16px', background: '#f8f9fa', color: '#1a1a2e', borderRadius: 16, border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
                       Cancel
                     </button>
                   </div>
@@ -419,7 +716,7 @@ export default function Scanner() {
                 <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e', marginBottom: 12 }}>Product Details</h3>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ color: '#718096', fontSize: 14 }}>Name</span>
-                  <span style={{ fontWeight: 600, color: '#1a1a2e', fontSize: 14 }}>{product.product_name}</span>
+                  <span style={{ fontWeight: 600, color: '#1a1a2e', fontSize: 14 }}>{product?.medicine_name || product?.product_name || resolvedBatch?.product_name}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ color: '#718096', fontSize: 14 }}>Batch</span>
@@ -448,18 +745,23 @@ export default function Scanner() {
                 </div>
               </div>
 
-              <button onClick={readAloud} style={{ width: '100%', padding: '16px', background: '#e0e7ff', color: '#4338ca', fontWeight: 600, borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 16, marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <button onClick={readAloud} style={{ width: '100%', padding: '16px', background: '#e0e7ff', color: '#4338ca', fontWeight: 600, borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 16, marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit' }}>
                 <HiOutlineSpeakerWave style={{ width: 24, height: 24 }} />
                 Read Aloud
               </button>
 
-              <button onClick={resetAll} style={{ width: '100%', padding: '16px', background: '#1a1a2e', color: 'white', fontWeight: 600, borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 16 }}>
+              <button onClick={resetAll} style={{ width: '100%', padding: '16px', background: '#1a1a2e', color: 'white', fontWeight: 600, borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 16, fontFamily: 'inherit' }}>
                 Scan Another Product
               </button>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 0.3; } }
+      `}</style>
     </div>
   );
 }

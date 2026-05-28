@@ -23,7 +23,7 @@ export default function Navbar() {
   ];
 
   return (
-    <motion.nav
+    <motion.header
       initial={{ y: -80 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
@@ -36,7 +36,7 @@ export default function Navbar() {
         boxShadow: scrolled ? '0 1px 3px rgba(0,0,0,0.04)' : 'none',
       }}
     >
-      <div className="container-main navbar-height" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '72px' }}>
+      <nav className="container-main navbar-height" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         {/* Logo */}
         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
           <div style={{ width: 32, height: 32, borderRadius: 8, background: '#2d6a4f', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -87,12 +87,13 @@ export default function Navbar() {
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
             className="nav-mobile-toggle"
+            aria-label="Toggle navigation menu"
             style={{ padding: 8, borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#718096' }}
           >
             {mobileOpen ? <HiOutlineXMark style={{ width: 20, height: 20 }} /> : <HiOutlineBars3 style={{ width: 20, height: 20 }} />}
           </button>
         </div>
-      </div>
+      </nav>
 
       {/* Mobile Menu */}
       <AnimatePresence>
@@ -123,6 +124,6 @@ export default function Navbar() {
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.nav>
+    </motion.header>
   );
 }

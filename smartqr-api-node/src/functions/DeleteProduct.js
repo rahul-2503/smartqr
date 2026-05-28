@@ -10,54 +10,51 @@ app.http('DeleteBatch', {
         try {
             // Enterprise Authentication
             const authHeader = request.headers.get('authorization');
-            let decodedToken;
+            let authUser;
             try {
-                decodedToken = await verifyToken(authHeader);
+                authUser = await verifyToken(authHeader);
             } catch (authErr) {
-                return { status: 401, body: JSON.stringify({ error: "Unauthorized: " + authErr.message }) };
+                return { status: 401, jsonBody: { error: "Unauthorized: " + authErr.message } };
             }
-            
-            const organizationId = decodedToken.uid || decodedToken.sub;
 
+            const organizationDomain = authUser.organizationDomain;
             const barcode = request.params.barcode;
             const batch_id = request.params.batch_id;
             const { batches, auditLogs } = await getContainers();
 
             const id = `${barcode}_${batch_id}`;
             
-            // Read first to enforce tenant isolation
+            // Read first to enforce organization-level tenant isolation
             const existingBatch = await batches.item(id, barcode).read();
             if (!existingBatch.resource) {
-                return { status: 404, body: JSON.stringify({ error: "Batch not found" }) };
+                return { status: 404, jsonBody: { error: "Batch not found" } };
             }
 
-            if (existingBatch.resource.organizationId && existingBatch.resource.organizationId !== organizationId) {
-                return { status: 403, body: JSON.stringify({ error: "Forbidden: You do not own this batch" }) };
+            if (existingBatch.resource.organizationDomain && existingBatch.resource.organizationDomain !== organizationDomain) {
+                return { status: 403, jsonBody: { error: "Forbidden: This batch belongs to a different organization" } };
             }
 
             await batches.item(id, barcode).delete();
 
             // Audit Trail
             await auditLogs.items.create({
-                id: Math.random().toString(36).substring(2, 15) + Date.now().toString(36),
-                organizationId: organizationId,
+                id: `audit-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`,
+                organizationDomain: organizationDomain,
                 action: "DELETE_BATCH",
+                actor: authUser.email,
                 details: `Deleted batch ${batch_id} for product ${barcode}`,
+                entityId: batch_id,
+                entityType: "batch",
                 timestamp: new Date().toISOString()
             });
 
             return {
                 status: 200,
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: "Batch deleted securely!", batch_id: batch_id })
+                jsonBody: { message: "Batch deleted securely!", batch_id: batch_id }
             };
         } catch (err) {
             context.error(err);
-            return {
-                status: 500,
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ error: "Internal server error" })
-            };
+            return { status: 500, jsonBody: { error: "Internal server error" } };
         }
     }
 });

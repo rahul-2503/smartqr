@@ -9,21 +9,20 @@ app.http('AddProduct', {
         try {
             // Enterprise Authentication
             const authHeader = request.headers.get('authorization');
-            let decodedToken;
+            let authUser;
             try {
-                decodedToken = await verifyToken(authHeader);
+                authUser = await verifyToken(authHeader);
             } catch (authErr) {
-                return { status: 401, body: JSON.stringify({ error: "Unauthorized: " + authErr.message }) };
+                return { status: 401, jsonBody: { error: "Unauthorized: " + authErr.message } };
             }
-            
-            const organizationId = decodedToken.uid || decodedToken.sub; // Firebase Identity ID
 
+            const organizationDomain = authUser.organizationDomain;
             const data = await request.json();
             const required = ["barcode", "product_name", "manufacturer", "category"];
 
             for (const field of required) {
                 if (!data[field]) {
-                    return { status: 400, body: JSON.stringify({ error: `Missing field: ${field}` }) };
+                    return { status: 400, jsonBody: { error: `Missing field: ${field}` } };
                 }
             }
 
@@ -37,7 +36,9 @@ app.http('AddProduct', {
                 category: data.category,
                 instructions: data.instructions || "",
                 warnings: data.warnings || "",
-                organizationId: organizationId, // Tenant isolation
+                organizationDomain: organizationDomain,
+                organizationName: authUser.organizationName,
+                createdByEmail: authUser.email,
                 created_at: new Date().toISOString(),
                 community_verifications: 0
             };
@@ -46,21 +47,23 @@ app.http('AddProduct', {
 
             // Audit Trail
             await auditLogs.items.create({
-                id: Math.random().toString(36).substring(2, 15) + Date.now().toString(36),
-                organizationId: organizationId,
+                id: `audit-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`,
+                organizationDomain: organizationDomain,
                 action: "ADD_PRODUCT",
+                actor: authUser.email,
                 details: `Created product profile for ${data.product_name} (${data.barcode})`,
+                entityId: data.barcode,
+                entityType: "product",
                 timestamp: new Date().toISOString()
             });
 
             return {
                 status: 201,
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: "Product profile saved securely!", barcode: data.barcode })
+                jsonBody: { message: "Product profile saved securely!", barcode: data.barcode }
             };
         } catch (err) {
             context.error(err);
-            return { status: 500, body: JSON.stringify({ error: "Internal server error" }) };
+            return { status: 500, jsonBody: { error: "Internal server error" } };
         }
     }
 });

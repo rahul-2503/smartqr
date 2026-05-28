@@ -12,7 +12,7 @@ let containersPromise = null;
 async function getContainers() {
     if (!containersPromise) {
         containersPromise = (async () => {
-            // Using new container names to avoid clashes with the old schema's partition keys
+            // Consumer-facing containers (existing, untouched)
             const { container: products } = await database.containers.createIfNotExists({ 
                 id: "RetailProducts", 
                 partitionKey: { paths: ["/barcode"] } 
@@ -21,23 +21,30 @@ async function getContainers() {
                 id: "RetailBatches", 
                 partitionKey: { paths: ["/barcode"] } 
             });
+
+            // Organization-based containers (rebuilt for enterprise multi-tenant)
+            const { container: organizations } = await database.containers.createIfNotExists({
+                id: "Organizations",
+                partitionKey: { paths: ["/domain"] }
+            });
             const { container: auditLogs } = await database.containers.createIfNotExists({
                 id: "AuditLogs",
-                partitionKey: { paths: ["/organizationId"] }
+                partitionKey: { paths: ["/organizationDomain"] }
             });
-            const { container: manufacturers } = await database.containers.createIfNotExists({
-                id: "Manufacturers",
-                partitionKey: { paths: ["/mfr_id"] }
+            const { container: manufacturers } = await database.containers.createIfNotExists({ 
+                id: "Manufacturers", 
+                partitionKey: { paths: ["/mfr_id"] } 
             });
-            const { container: medicineProducts } = await database.containers.createIfNotExists({
-                id: "MedicineProducts",
-                partitionKey: { paths: ["/mfr_id"] }
+            const { container: medicineProducts } = await database.containers.createIfNotExists({ 
+                id: "MedicineProducts", 
+                partitionKey: { paths: ["/organizationDomain"] } 
             });
-            const { container: smartBatches } = await database.containers.createIfNotExists({
-                id: "Batches",
-                partitionKey: { paths: ["/mfr_id"] }
+            const { container: smartBatches } = await database.containers.createIfNotExists({ 
+                id: "SmartBatches", 
+                partitionKey: { paths: ["/organizationDomain"] } 
             });
-            return { products, batches, auditLogs, manufacturers, medicineProducts, smartBatches };
+
+            return { products, batches, organizations, auditLogs, manufacturers, medicineProducts, smartBatches };
         })();
     }
     return containersPromise;

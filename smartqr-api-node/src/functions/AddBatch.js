@@ -9,34 +9,34 @@ app.http('AddBatch', {
         try {
             // Enterprise Authentication
             const authHeader = request.headers.get('authorization');
-            let decodedToken;
+            let authUser;
             try {
-                decodedToken = await verifyToken(authHeader);
+                authUser = await verifyToken(authHeader);
             } catch (authErr) {
-                return { status: 401, body: JSON.stringify({ error: "Unauthorized: " + authErr.message }) };
+                return { status: 401, jsonBody: { error: "Unauthorized: " + authErr.message } };
             }
-            
-            const organizationId = decodedToken.uid || decodedToken.sub;
 
+            const organizationDomain = authUser.organizationDomain;
             const data = await request.json();
             const required = ["barcode", "batch_id", "mfg_date", "exp_date"];
 
             for (const field of required) {
                 if (!data[field]) {
-                    return { status: 400, body: JSON.stringify({ error: `Missing field: ${field}` }) };
+                    return { status: 400, jsonBody: { error: `Missing field: ${field}` } };
                 }
             }
 
             const { batches, auditLogs } = await getContainers();
 
-            // The id needs to be unique. We can use a combination of barcode and batch_id.
             const item = {
                 id: `${data.barcode}_${data.batch_id}`,
                 barcode: data.barcode,
                 batch_id: data.batch_id,
                 mfg_date: data.mfg_date,
                 exp_date: data.exp_date,
-                organizationId: organizationId, // Tenant isolation
+                organizationDomain: organizationDomain,
+                organizationName: authUser.organizationName,
+                createdByEmail: authUser.email,
                 created_at: new Date().toISOString(),
                 community_verifications: 0
             };
@@ -45,21 +45,23 @@ app.http('AddBatch', {
 
             // Audit Trail
             await auditLogs.items.create({
-                id: Math.random().toString(36).substring(2, 15) + Date.now().toString(36),
-                organizationId: organizationId,
+                id: `audit-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`,
+                organizationDomain: organizationDomain,
                 action: "ADD_BATCH",
+                actor: authUser.email,
                 details: `Added batch ${data.batch_id} for product ${data.barcode}`,
+                entityId: data.batch_id,
+                entityType: "batch",
                 timestamp: new Date().toISOString()
             });
 
             return {
                 status: 201,
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: "Batch saved successfully!", batch_id: data.batch_id })
+                jsonBody: { message: "Batch saved successfully!", batch_id: data.batch_id }
             };
         } catch (err) {
             context.error(err);
-            return { status: 500, body: JSON.stringify({ error: "Internal server error" }) };
+            return { status: 500, jsonBody: { error: "Internal server error" } };
         }
     }
 });
