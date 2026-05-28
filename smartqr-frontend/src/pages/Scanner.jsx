@@ -20,7 +20,7 @@ function getStatus(t) {
 }
 
 export default function Scanner() {
-  const { t, speechLang } = useLanguage();
+  const { t, speechLang, lang } = useLanguage();
   const STATUS = getStatus(t);
   const [step, setStep] = useState('BARCODE'); // 'BARCODE', 'PRODUCT_FOUND', 'RESULT'
   const [product, setProduct] = useState(null);
@@ -329,21 +329,46 @@ export default function Scanner() {
 
   const readAloud = () => {
     if (!product || !resolvedBatch) return;
+    
     const isExpired = resolvedBatch.status === 'EXPIRED';
-    let text = `${product.medicine_name || product.product_name || resolvedBatch.product_name || ''}, ${product.dosage || ''}. `;
-    if (isExpired) {
-      text += "Warning! This product has expired. Do not consume. ";
-    } else {
-      text += "This product is safe to consume. ";
-    }
+    const isExpiring = resolvedBatch.status === 'EXPIRING_SOON';
+    
+    const name = product.medicine_name || product.product_name || resolvedBatch.product_name || '';
+    const mfr = resolvedBatch.organizationName || product.organizationName || '';
+    
+    const st = isExpired
+      ? t('productDetail.speechExpired', { days: Math.abs(resolvedBatch.days_left || 0) })
+      : isExpiring
+        ? t('productDetail.speechExpiring', { days: resolvedBatch.days_left || 0 })
+        : t('productDetail.speechSafe', { days: resolvedBatch.days_left || 0 });
+        
+    let text = t('productDetail.speechIntro', { product: name, manufacturer: mfr });
+    text += ' ' + t('productDetail.speechStatus', { status: st });
+    
     if (product.dosage_instructions) {
-      text += `Dosage instructions: ${product.dosage_instructions}. `;
+      text += ' ' + t('productDetail.speechInstructions', { instructions: product.dosage_instructions });
     }
     if (product.warnings) {
-      text += `Warning: ${product.warnings}. `;
+      text += ' ' + t('productDetail.speechWarnings', { warnings: product.warnings });
     }
+    
     const msg = new SpeechSynthesisUtterance(text);
     msg.lang = speechLang;
+    
+    if (window.speechSynthesis) {
+      const voices = window.speechSynthesis.getVoices();
+      let voice = voices.find(v => v.lang === speechLang);
+      if (!voice) {
+        voice = voices.find(v => v.lang.startsWith(lang));
+      }
+      if (!voice) {
+        voice = voices.find(v => v.lang.toLowerCase().includes(lang.toLowerCase()));
+      }
+      if (voice) {
+        msg.voice = voice;
+      }
+    }
+    
     msg.rate = 0.9;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(msg);

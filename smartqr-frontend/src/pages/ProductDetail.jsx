@@ -8,8 +8,23 @@ import {
   HiOutlineExclamationTriangle, HiOutlineArrowLeft, HiOutlineQrCode,
 } from 'react-icons/hi2';
 
+const formatDateForSpeech = (dateStr, lang) => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return dateStr;
+  try {
+    return date.toLocaleDateString(lang === 'en' ? 'en-IN' : lang, {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+  } catch (e) {
+    return dateStr;
+  }
+};
+
 export default function ProductDetail() {
-  const { t, speechLang } = useLanguage();
+  const { t, speechLang, lang } = useLanguage();
 
   const STATUS_CONFIG = {
     SAFE: { label: t('productDetail.statusSafe'), bg: '#f0fdf4', fg: '#166534', border: '#bbf7d0', icon: HiOutlineShieldCheck, iconColor: '#16a34a', gradient: 'linear-gradient(135deg, #f0fdf4, #ecfdf5)' },
@@ -77,15 +92,31 @@ export default function ProductDetail() {
         ? t('productDetail.speechExpiring', { days: data.days_left })
         : t('productDetail.speechExpired', { days: Math.abs(data.days_left) });
     
+    const formattedMfg = formatDateForSpeech(data.mfg_date, lang);
+    const formattedExp = formatDateForSpeech(data.exp_date, lang);
+    
     let text = t('productDetail.speechIntro', { product: data.product_name, manufacturer: data.manufacturer });
     if (data.category) text += ' ' + t('productDetail.speechCategory', { category: data.category });
-    text += ' ' + t('productDetail.speechMfg', { mfgDate: data.mfg_date, expDate: data.exp_date });
+    text += ' ' + t('productDetail.speechMfg', { mfgDate: formattedMfg, expDate: formattedExp });
     text += ' ' + t('productDetail.speechStatus', { status: st });
     if (data.instructions) text += ' ' + t('productDetail.speechInstructions', { instructions: data.instructions });
     if (data.warnings) text += ' ' + t('productDetail.speechWarnings', { warnings: data.warnings });
     
     const u = new SpeechSynthesisUtterance(text);
     u.lang = speechLang;
+    
+    const voices = window.speechSynthesis.getVoices();
+    let voice = voices.find(v => v.lang === speechLang);
+    if (!voice) {
+      voice = voices.find(v => v.lang.startsWith(lang));
+    }
+    if (!voice) {
+      voice = voices.find(v => v.lang.toLowerCase().includes(lang.toLowerCase()));
+    }
+    if (voice) {
+      u.voice = voice;
+    }
+    
     u.rate = 0.9;
     window.speechSynthesis.speak(u);
   };
