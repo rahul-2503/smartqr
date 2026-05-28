@@ -155,6 +155,8 @@
     "name": "नाम",
     "batch": "बैच",
     "expiry": "एक्सपायरी",
+    "manufacturer": "निर्माता",
+    "mfgDate": "निर्माण तिथि",
     "authenticity": "प्रामाणिकता गारंटीकृत",
     "tablet": "गोली",
     "ofStrip": "स्ट्रिप में से",

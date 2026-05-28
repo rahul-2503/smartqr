@@ -748,15 +748,25 @@ export default function Scanner() {
                 <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e', marginBottom: 12 }}>{t('scanner.productDetails')}</h3>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ color: '#718096', fontSize: 14 }}>{t('scanner.name')}</span>
-                  <span style={{ fontWeight: 600, color: '#1a1a2e', fontSize: 14 }}>{product?.medicine_name || product?.product_name || resolvedBatch?.product_name}</span>
+                  <span style={{ fontWeight: 600, color: '#1a1a2e', fontSize: 14, textAlign: 'right' }}>{product?.medicine_name || product?.product_name || resolvedBatch?.product_name}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ color: '#718096', fontSize: 14 }}>{t('scanner.manufacturer')}</span>
+                  <span style={{ fontWeight: 600, color: '#1a1a2e', fontSize: 14, textAlign: 'right' }}>{resolvedBatch.organizationName || product?.organizationName || product?.manufacturer || 'Unknown Manufacturer'}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ color: '#718096', fontSize: 14 }}>{t('scanner.batch')}</span>
-                  <span style={{ fontWeight: 600, color: '#1a1a2e', fontSize: 14 }}>{resolvedBatch.batch_id}</span>
+                  <span style={{ fontWeight: 600, color: '#1a1a2e', fontSize: 14, textAlign: 'right' }}>{resolvedBatch.batch_id}</span>
                 </div>
+                {resolvedBatch.mfg_date && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ color: '#718096', fontSize: 14 }}>{t('scanner.mfgDate')}</span>
+                    <span style={{ fontWeight: 600, color: '#1a1a2e', fontSize: 14, textAlign: 'right' }}>{resolvedBatch.mfg_date}</span>
+                  </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: '#718096', fontSize: 14 }}>{t('scanner.expiry')}</span>
-                  <span style={{ fontWeight: 600, color: '#1a1a2e', fontSize: 14 }}>{resolvedBatch.exp_date}</span>
+                  <span style={{ fontWeight: 600, color: '#1a1a2e', fontSize: 14, textAlign: 'right' }}>{resolvedBatch.exp_date}</span>
                 </div>
               </div>
 

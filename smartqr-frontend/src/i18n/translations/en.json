@@ -155,6 +155,8 @@
     "name": "Name",
     "batch": "Batch",
     "expiry": "Expiry",
+    "manufacturer": "Manufacturer",
+    "mfgDate": "MFG Date",
     "authenticity": "Authenticity Guaranteed",
     "tablet": "Tablet",
     "ofStrip": "of Strip",
