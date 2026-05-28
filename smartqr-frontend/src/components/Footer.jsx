@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom';
 import { HiOutlineQrCode } from 'react-icons/hi2';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export default function Footer() {
+  const { t } = useLanguage();
+
   return (
     <footer style={{ background: '#f8f9fa', borderTop: '1px solid #f1f3f5' }}>
       <div className="container-main" style={{ paddingTop: 'var(--section-padding)', paddingBottom: 'var(--section-padding)' }}>
@@ -13,13 +16,13 @@ export default function Footer() {
               </div>
               <span style={{ fontSize: 16, fontWeight: 700, color: '#1a1a2e' }}>Smart<span style={{ color: '#2d6a4f' }}>QR</span></span>
             </Link>
-            <p style={{ fontSize: 14, color: '#a0aec0', lineHeight: 1.6 }}>Smart product transparency and expiry intelligence for everyone.</p>
+            <p style={{ fontSize: 14, color: '#a0aec0', lineHeight: 1.6 }}>{t('footer.tagline')}</p>
           </div>
 
           {[
-            { title: 'Product', links: [{ l: 'Scanner', t: '/scan' }, { l: 'Manufacturer Portal', t: '/manufacturer' }, { l: 'For Manufacturers', t: '/about' }, { l: 'For Consumers', t: '/about' }] },
-            { title: 'Company', links: [{ l: 'About', t: '/about' }, { l: 'Mission', t: '/about' }] },
-            { title: 'Connect', links: [{ l: 'GitHub', t: '#' }, { l: 'LinkedIn', t: '#' }, { l: 'Contact', t: '#' }] },
+            { title: t('footer.colProduct'), links: [{ l: t('footer.linkScanner'), t: '/scan' }, { l: t('footer.linkManufacturerPortal'), t: '/manufacturer' }, { l: t('footer.linkForManufacturers'), t: '/about' }, { l: t('footer.linkForConsumers'), t: '/about' }] },
+            { title: t('footer.colCompany'), links: [{ l: t('footer.linkAbout'), t: '/about' }, { l: t('footer.linkMission'), t: '/about' }] },
+            { title: t('footer.colConnect'), links: [{ l: 'GitHub', t: '#' }, { l: 'LinkedIn', t: '#' }, { l: 'Contact', t: '#' }] },
           ].map(col => (
             <div key={col.title}>
               <h4 style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.15em' }}>{col.title}</h4>
@@ -38,8 +41,8 @@ export default function Footer() {
         </div>
 
         <div className="footer-bottom" style={{ marginTop: 48, paddingTop: 32, borderTop: '1px solid #e2e8f0' }}>
-          <p style={{ fontSize: 12, color: '#a0aec0' }}>© {new Date().getFullYear()} SmartQR. Built with Azure Cloud.</p>
-          <p style={{ fontSize: 12, color: '#a0aec0' }}>Designed for accessibility. Made in India.</p>
+          <p style={{ fontSize: 12, color: '#a0aec0' }}>© {new Date().getFullYear()} {t('footer.copyright')}</p>
+          <p style={{ fontSize: 12, color: '#a0aec0' }}>{t('footer.madeIn')}</p>
         </div>
       </div>
     </footer>

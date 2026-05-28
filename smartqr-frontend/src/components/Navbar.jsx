@@ -2,11 +2,14 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { HiOutlineQrCode, HiOutlineBars3, HiOutlineXMark } from 'react-icons/hi2';
+import { useLanguage } from '../i18n/LanguageContext';
+import LanguageSwitcher from './LanguageSwitcher';
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const { t } = useLanguage();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -17,9 +20,9 @@ export default function Navbar() {
   useEffect(() => setMobileOpen(false), [location]);
 
   const navLinks = [
-    { to: '/', label: 'Home' },
-    { to: '/scan', label: 'Scan' },
-    { to: '/about', label: 'About' },
+    { to: '/', label: t('nav.home') },
+    { to: '/scan', label: t('nav.scan') },
+    { to: '/about', label: t('nav.about') },
   ];
 
   return (
@@ -69,8 +72,11 @@ export default function Navbar() {
           ))}
         </div>
 
-        {/* CTA */}
+        {/* CTA + Language Switcher */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="nav-desktop">
+            <LanguageSwitcher />
+          </div>
           <Link
             to="/scan"
             className="nav-desktop"
@@ -82,7 +88,7 @@ export default function Navbar() {
             }}
           >
             <HiOutlineQrCode style={{ width: 14, height: 14 }} />
-            Scan Product
+            {t('nav.scanProduct')}
           </Link>
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
@@ -120,6 +126,9 @@ export default function Navbar() {
                   {link.label}
                 </Link>
               ))}
+              <div style={{ padding: '12px 16px' }}>
+                <LanguageSwitcher />
+              </div>
             </div>
           </motion.div>
         )}

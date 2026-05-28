@@ -1,42 +1,20 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { HiOutlineChevronDown } from 'react-icons/hi2';
-
-const faqs = [
-  {
-    question: 'What is SmartQR?',
-    answer:
-      'SmartQR is a product transparency platform that connects manufacturers with consumers through intelligent QR codes. Each QR code is linked to real-time product data — including batch details, manufacturing dates, and expiry information — so consumers can instantly verify authenticity and safety.',
-  },
-  {
-    question: 'Is SmartQR free to use for consumers?',
-    answer:
-      'Yes, scanning and verifying products through SmartQR is completely free for consumers. Simply scan any SmartQR-enabled product label to instantly access batch details, expiry status, and safety information — no account or registration required.',
-  },
-  {
-    question: 'How does expiry intelligence work?',
-    answer:
-      'SmartQR calculates the real-time expiry status of every product by comparing its manufacturing date, shelf life, and the current date. Products are color-coded as Safe (green), Expiring Soon (amber), or Expired (red), giving you an instant visual indicator of product safety.',
-  },
-  {
-    question: 'Can I use SmartQR for my manufacturing business?',
-    answer:
-      'Absolutely. SmartQR provides a dedicated Manufacturer Portal where you can register your products, create batches, generate branded QR codes, and track product lifecycles — all from a single, easy-to-use dashboard. It is built on Azure Cloud for enterprise-grade reliability.',
-  },
-  {
-    question: 'What is the voice accessibility feature?',
-    answer:
-      'SmartQR includes a built-in text-to-speech feature that reads product details aloud when you tap the voice button. This is designed specifically for elderly users and people with visual impairments, ensuring product safety information is accessible to everyone.',
-  },
-  {
-    question: 'How secure is the data on SmartQR?',
-    answer:
-      'All data is stored on Azure Cosmos DB with enterprise-level encryption and security. Manufacturer accounts are protected with JWT-based authentication, and all API communication is encrypted end-to-end. We never share your data with third parties.',
-  },
-];
+import { useLanguage } from '../../i18n/LanguageContext';
 
 export default function FAQ() {
   const [openIndex, setOpenIndex] = useState(0);
+  const { t } = useLanguage();
+
+  const faqs = [
+    { question: t('faq.q1'), answer: t('faq.a1') },
+    { question: t('faq.q2'), answer: t('faq.a2') },
+    { question: t('faq.q3'), answer: t('faq.a3') },
+    { question: t('faq.q4'), answer: t('faq.a4') },
+    { question: t('faq.q5'), answer: t('faq.a5') },
+    { question: t('faq.q6'), answer: t('faq.a6') },
+  ];
 
   const toggle = (index) => {
     setOpenIndex(openIndex === index ? -1 : index);
@@ -69,7 +47,7 @@ export default function FAQ() {
               lineHeight: 1.2,
             }}
           >
-            Frequently asked questions
+            {t('faq.heading')}
           </h2>
         </motion.div>
 

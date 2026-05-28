@@ -4,17 +4,20 @@ import {
   HiOutlineEye, HiOutlineBolt, HiOutlineGlobeAlt,
   HiOutlineExclamationTriangle, HiOutlineCubeTransparent,
 } from 'react-icons/hi2';
-
-const values = [
-  { icon: HiOutlineShieldCheck, title: 'Safety First', description: 'Every feature we build starts with one question: does this make products safer for consumers?', iconBg: '#f0fdf4', iconColor: '#16a34a' },
-  { icon: HiOutlineSpeakerWave, title: 'Accessibility as a Core Feature', description: 'Voice readout, large text, clear colors — designed for elderly, visually challenged, and non-literate users.', iconBg: '#eff6ff', iconColor: '#3b82f6' },
-  { icon: HiOutlineEye, title: 'Transparency', description: 'We believe consumers deserve to know exactly what they are using — manufacturer, batch, dates, and safety instructions.', iconBg: '#faf5ff', iconColor: '#9333ea' },
-  { icon: HiOutlineGlobeAlt, title: 'Built for Everyone', description: 'From small-scale manufacturers in rural India to consumers in cities — SmartQR works for all.', iconBg: '#fffbeb', iconColor: '#d97706' },
-];
+import { useLanguage } from '../i18n/LanguageContext';
 
 const tech = ['Azure Functions', 'Azure Cosmos DB', 'Azure Static Web Apps', 'React', 'Tailwind CSS', 'Framer Motion'];
 
 export default function About() {
+  const { t } = useLanguage();
+
+  const values = [
+    { icon: HiOutlineShieldCheck, title: t('about.v1Title'), description: t('about.v1Desc'), iconBg: '#f0fdf4', iconColor: '#16a34a' },
+    { icon: HiOutlineSpeakerWave, title: t('about.v2Title'), description: t('about.v2Desc'), iconBg: '#eff6ff', iconColor: '#3b82f6' },
+    { icon: HiOutlineEye, title: t('about.v3Title'), description: t('about.v3Desc'), iconBg: '#faf5ff', iconColor: '#9333ea' },
+    { icon: HiOutlineGlobeAlt, title: t('about.v4Title'), description: t('about.v4Desc'), iconBg: '#fffbeb', iconColor: '#d97706' },
+  ];
+
   return (
     <div style={{ minHeight: '100vh', background: '#ffffff' }}>
       {/* Hero */}
@@ -23,13 +26,13 @@ export default function About() {
           <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '8px 16px', background: 'white', borderRadius: 999, border: '1px solid #d8f3dc', marginBottom: 32, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
               <HiOutlineLightBulb style={{ width: 16, height: 16, color: '#2d6a4f' }} />
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#2d6a4f' }}>Our Story</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#2d6a4f' }}>{t('about.badge')}</span>
             </div>
             <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', fontWeight: 800, color: '#1a1a2e', lineHeight: 1.15, letterSpacing: '-0.02em' }}>
-              The story behind SmartQR
+              {t('about.heading')}
             </h1>
             <p style={{ maxWidth: 560, margin: '20px auto 0', fontSize: 18, color: '#718096', lineHeight: 1.7 }}>
-              It started with a simple observation: when you tear a tablet strip, the expiry date is lost. Later, it becomes impossible to know if those remaining tablets are still safe. This happens in millions of Indian households every day.
+              {t('about.intro')}
             </p>
           </motion.div>
         </div>
@@ -40,21 +43,21 @@ export default function About() {
         <div className="container-main">
           <div className="grid-2col">
             <motion.div initial={{ opacity: 0, x: -24 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.7 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.2em' }}>The Problem</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.2em' }}>{t('about.problemLabel')}</span>
               <h2 style={{ marginTop: 16, fontSize: 'clamp(1.5rem, 3vw, 2.2rem)', fontWeight: 800, color: '#1a1a2e', lineHeight: 1.2, letterSpacing: '-0.02em' }}>
-                Expiry dates shouldn't disappear when packaging tears.
+                {t('about.problemHeading')}
               </h2>
               <p style={{ marginTop: 20, fontSize: 16, color: '#718096', lineHeight: 1.7 }}>
-                Existing barcodes on medicine strips only contain a product ID — not batch-level expiry data. There is no complete public Indian medicine database with this information. And for elderly or non-literate users, even reading the tiny printed dates is a challenge.
+                {t('about.problemDesc')}
               </p>
             </motion.div>
             <motion.div initial={{ opacity: 0, x: 24 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.7 }}>
               <div style={{ background: '#fef2f2', borderRadius: 20, padding: 32, border: '1px solid #fecaca' }}>
                 {[
-                  { icon: '💊', text: 'Tablet strip tears — expiry date is gone' },
-                  { icon: '👴', text: "Elderly can't read tiny print on labels" },
-                  { icon: '⚠️', text: 'Patients managing 5-6 medicines daily get confused' },
-                  { icon: '🌍', text: "Rural and non-literate users can't read English labels" },
+                  { icon: '💊', text: t('about.problemPoint1') },
+                  { icon: '👴', text: t('about.problemPoint2') },
+                  { icon: '⚠️', text: t('about.problemPoint3') },
+                  { icon: '🌍', text: t('about.problemPoint4') },
                 ].map((item, i) => (
                   <motion.div key={i} initial={{ opacity: 0, x: 12 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.4, delay: i * 0.08 }}
                     style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: i < 3 ? '1px solid rgba(239,68,68,0.1)' : 'none' }}>
@@ -72,12 +75,12 @@ export default function About() {
       <section style={{ paddingTop: 'var(--section-padding)', paddingBottom: 'var(--section-padding)', background: '#f8f9fa' }}>
         <div className="container-main" style={{ textAlign: 'center' }}>
           <motion.div initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.7 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#2d6a4f', textTransform: 'uppercase', letterSpacing: '0.2em' }}>Our Solution</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#2d6a4f', textTransform: 'uppercase', letterSpacing: '0.2em' }}>{t('about.solutionLabel')}</span>
             <h2 style={{ marginTop: 16, fontSize: 'clamp(1.5rem, 3vw, 2.2rem)', fontWeight: 800, color: '#1a1a2e', lineHeight: 1.2 }}>
-              A smarter QR-based ecosystem.
+              {t('about.solutionHeading')}
             </h2>
             <p style={{ maxWidth: 560, margin: '20px auto 0', fontSize: 16, color: '#718096', lineHeight: 1.7 }}>
-              We connect manufacturers with consumers through smart QR codes that carry batch-level product information — accessible to everyone, including those who can't read.
+              {t('about.solutionDesc')}
             </p>
           </motion.div>
 
@@ -103,16 +106,16 @@ export default function About() {
       <section style={{ paddingTop: 'var(--section-padding)', paddingBottom: 'var(--section-padding)', background: '#ffffff' }}>
         <div className="container-main" style={{ textAlign: 'center' }}>
           <motion.div initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.7 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#718096', textTransform: 'uppercase', letterSpacing: '0.2em' }}>Built With</span>
-            <h2 style={{ marginTop: 16, fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 800, color: '#1a1a2e' }}>Powered by Azure Cloud</h2>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#718096', textTransform: 'uppercase', letterSpacing: '0.2em' }}>{t('about.techLabel')}</span>
+            <h2 style={{ marginTop: 16, fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 800, color: '#1a1a2e' }}>{t('about.techHeading')}</h2>
           </motion.div>
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6, delay: 0.15 }}
             style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 12, marginTop: 32 }}>
-            {tech.map(t => (
-              <span key={t} style={{ padding: '10px 20px', borderRadius: 999, background: '#f8f9fa', border: '1px solid #e2e8f0', fontSize: 13, fontWeight: 600, color: '#1a1a2e', transition: 'all 0.2s' }}
+            {tech.map(techItem => (
+              <span key={techItem} style={{ padding: '10px 20px', borderRadius: 999, background: '#f8f9fa', border: '1px solid #e2e8f0', fontSize: 13, fontWeight: 600, color: '#1a1a2e', transition: 'all 0.2s' }}
                 onMouseEnter={e => { e.target.style.background = '#2d6a4f'; e.target.style.color = 'white'; e.target.style.borderColor = '#2d6a4f'; }}
                 onMouseLeave={e => { e.target.style.background = '#f8f9fa'; e.target.style.color = '#1a1a2e'; e.target.style.borderColor = '#e2e8f0'; }}>
-                {t}
+                {techItem}
               </span>
             ))}
           </motion.div>
@@ -123,11 +126,11 @@ export default function About() {
       <section style={{ paddingTop: 'var(--section-padding)', paddingBottom: 'var(--section-padding)', background: '#f8f9fa' }}>
         <div className="container-narrow" style={{ textAlign: 'center' }}>
           <motion.div initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.7 }}>
-            <h2 style={{ fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 800, color: '#1a1a2e' }}>Ready to try it?</h2>
-            <p style={{ marginTop: 12, fontSize: 16, color: '#718096' }}>Scan a product, add your own, or explore the dashboard.</p>
+            <h2 style={{ fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 800, color: '#1a1a2e' }}>{t('about.ctaHeading')}</h2>
+            <p style={{ marginTop: 12, fontSize: 16, color: '#718096' }}>{t('about.ctaSubtitle')}</p>
             <div className="flex-responsive" style={{ justifyContent: 'center', marginTop: 32 }}>
-              <a href="/scan" style={{ padding: '14px 28px', background: '#2d6a4f', color: 'white', fontWeight: 600, borderRadius: 12, textDecoration: 'none', boxShadow: '0 4px 12px rgba(45,106,79,0.2)' }}>Scan a Product</a>
-              <a href="/dashboard" style={{ padding: '14px 28px', background: 'white', color: '#1a1a2e', fontWeight: 600, borderRadius: 12, textDecoration: 'none', border: '1px solid #e2e8f0' }}>Open Dashboard</a>
+              <a href="/scan" style={{ padding: '14px 28px', background: '#2d6a4f', color: 'white', fontWeight: 600, borderRadius: 12, textDecoration: 'none', boxShadow: '0 4px 12px rgba(45,106,79,0.2)' }}>{t('about.ctaScan')}</a>
+              <a href="/dashboard" style={{ padding: '14px 28px', background: 'white', color: '#1a1a2e', fontWeight: 600, borderRadius: 12, textDecoration: 'none', border: '1px solid #e2e8f0' }}>{t('about.ctaDashboard')}</a>
             </div>
           </motion.div>
         </div>

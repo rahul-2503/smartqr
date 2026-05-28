@@ -1,8 +1,10 @@
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { HiOutlineQrCode, HiOutlineShieldCheck, HiOutlineArrowRight } from 'react-icons/hi2';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 export default function Hero() {
+  const { t } = useLanguage();
   // Parallax mouse effect
   const x = useMotionValue(0);
   const y = useMotionValue(0);
@@ -74,7 +76,7 @@ export default function Hero() {
               >
                 <div style={{ width: 6, height: 6, background: '#10b981', borderRadius: '50%' }} />
                 <span style={{ fontSize: '10px', fontWeight: 700, color: '#3f3f46', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                  Enterprise Product Intelligence
+                  {t('hero.badge')}
                 </span>
               </div>
             </motion.div>
@@ -91,8 +93,8 @@ export default function Hero() {
                 letterSpacing: '-0.03em' 
               }}
             >
-              Smart product transparency and <br/>
-              <span style={{ color: '#10b981' }}>expiry intelligence</span>.
+              {t('hero.heading1')} <br/>
+              <span style={{ color: '#10b981' }}>{t('hero.heading2')}</span>.
             </motion.h1>
 
             <motion.p 
@@ -101,7 +103,7 @@ export default function Hero() {
               transition={{ duration: 0.6, delay: 0.2 }}
               style={{ marginTop: '24px', fontSize: '17px', color: '#52525b', lineHeight: 1.6 }}
             >
-              Bridge the gap between manufacture safety and consumer confidence. Instantly scan, verify ingredients, track expiration, and maintain batch authenticity.
+              {t('hero.subtitle')}
             </motion.p>
 
             <motion.div 
@@ -129,7 +131,7 @@ export default function Hero() {
                 onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.background = '#09090b'; }}
               >
                 <HiOutlineQrCode style={{ width: 18, height: 18 }} />
-                Verify a Product
+                {t('hero.ctaScan')}
               </Link>
               
               <Link 
@@ -152,7 +154,7 @@ export default function Hero() {
                 onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.background = '#ffffff'; }}
               >
                 <HiOutlineShieldCheck style={{ width: 18, height: 18 }} />
-                Manufacturer Workspace
+                {t('hero.ctaDashboard')}
                 <HiOutlineArrowRight style={{ width: 14, height: 14 }} />
               </Link>
             </motion.div>
@@ -270,7 +272,7 @@ export default function Hero() {
                 className="hero-floating-tag"
               >
                 <div style={{ width: 8, height: 8, background: '#10b981', borderRadius: '50%' }} />
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#09090b' }}>Batch Authenticated</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: '#09090b' }}>{t('hero.floatingTag')}</span>
               </motion.div>
 
             </motion.div>

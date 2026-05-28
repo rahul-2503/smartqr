@@ -4,19 +4,24 @@ import { Html5Qrcode } from 'html5-qrcode';
 import Tesseract from 'tesseract.js';
 import jsQR from 'jsqr';
 import { getProductByBarcode } from '../api/products';
+import { useLanguage } from '../i18n/LanguageContext';
 import { 
   HiOutlineQrCode, HiOutlineExclamationTriangle, HiOutlineXMark, 
   HiOutlineShieldCheck, HiOutlineClock, HiOutlineCamera, HiOutlineCheckBadge, HiOutlineSpeakerWave,
   HiOutlineArrowUpTray
 } from 'react-icons/hi2';
 
-const STATUS = {
-  SAFE: { label: 'Safe to Consume', bg: '#f0fdf4', fg: '#166534', border: '#bbf7d0', icon: HiOutlineShieldCheck, msg: 'This product is fresh and safe to use.' },
-  EXPIRING_SOON: { label: 'Expiring Soon', bg: '#fffbeb', fg: '#92400e', border: '#fde68a', icon: HiOutlineClock, msg: 'Use caution. This product will expire soon.' },
-  EXPIRED: { label: 'Expired - Do Not Use', bg: '#fef2f2', fg: '#991b1b', border: '#fecaca', icon: HiOutlineExclamationTriangle, msg: 'Warning: This product has passed its expiry date.' }
-};
+function getStatus(t) {
+  return {
+    SAFE: { label: t('scanner.statusSafe'), bg: '#f0fdf4', fg: '#166534', border: '#bbf7d0', icon: HiOutlineShieldCheck, msg: t('scanner.statusSafeMsg') },
+    EXPIRING_SOON: { label: t('scanner.statusExpiring'), bg: '#fffbeb', fg: '#92400e', border: '#fde68a', icon: HiOutlineClock, msg: t('scanner.statusExpiringMsg') },
+    EXPIRED: { label: t('scanner.statusExpired'), bg: '#fef2f2', fg: '#991b1b', border: '#fecaca', icon: HiOutlineExclamationTriangle, msg: t('scanner.statusExpiredMsg') },
+  };
+}
 
 export default function Scanner() {
+  const { t, speechLang } = useLanguage();
+  const STATUS = getStatus(t);
   const [step, setStep] = useState('BARCODE'); // 'BARCODE', 'PRODUCT_FOUND', 'RESULT'
   const [product, setProduct] = useState(null);
   const [batches, setBatches] = useState([]);
@@ -81,7 +86,7 @@ export default function Scanner() {
       }
     } catch (err) {
       setScanning(false);
-      setCameraWarning('Camera not available — please allow camera permission.');
+      setCameraWarning(t('scanner.cameraWarning'));
       console.error('Camera error:', err);
     }
   };
@@ -338,6 +343,8 @@ export default function Scanner() {
       text += `Warning: ${product.warnings}. `;
     }
     const msg = new SpeechSynthesisUtterance(text);
+    msg.lang = speechLang;
+    msg.rate = 0.9;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(msg);
   };
@@ -509,8 +516,8 @@ export default function Scanner() {
         
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
           style={{ textAlign: 'center', marginBottom: 32 }}>
-          <h1 style={{ fontSize: 32, fontWeight: 800, color: '#1a1a2e', letterSpacing: '-0.02em' }}>Scan Product</h1>
-          <p style={{ marginTop: 8, fontSize: 16, color: '#718096' }}>Scan a QR code or barcode to instantly check safety and expiry status.</p>
+          <h1 style={{ fontSize: 32, fontWeight: 800, color: '#1a1a2e', letterSpacing: '-0.02em' }}>{t('scanner.title')}</h1>
+          <p style={{ marginTop: 8, fontSize: 16, color: '#718096' }}>{t('scanner.subtitle')}</p>
         </motion.div>
 
         {/* Hidden div for gallery QR scanning */}
@@ -548,9 +555,9 @@ export default function Scanner() {
                   <div style={{ width: 80, height: 80, margin: '0 auto 24px', background: '#f0fdf4', borderRadius: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <HiOutlineQrCode style={{ width: 40, height: 40, color: '#2d6a4f' }} />
                   </div>
-                  <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1a1a2e', marginBottom: 8 }}>Ready to scan</h2>
+                  <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1a1a2e', marginBottom: 8 }}>{t('scanner.readyTitle')}</h2>
                   <p style={{ color: '#718096', marginBottom: 32, fontSize: 14, lineHeight: 1.6 }}>
-                    Scan a QR code using your camera or upload an image from your gallery.
+                    {t('scanner.readyDesc')}
                   </p>
 
                   {/* Single unified action buttons */}
@@ -568,7 +575,7 @@ export default function Scanner() {
                       }}
                     >
                       <HiOutlineCamera style={{ width: 20, height: 20 }} />
-                      Open Camera
+                      {t('scanner.openCamera')}
                     </button>
                     <button 
                       onClick={() => fileInputRef.current?.click()} 
@@ -582,7 +589,7 @@ export default function Scanner() {
                       }}
                     >
                       <HiOutlineArrowUpTray style={{ width: 20, height: 20 }} />
-                      Upload Image
+                      {t('scanner.uploadImage')}
                     </button>
                   </div>
 
@@ -604,7 +611,7 @@ export default function Scanner() {
                             width: 20, height: 20, border: '2.5px solid #bae6fd', borderTopColor: '#0369a1', 
                             borderRadius: '50%', animation: 'spin 0.8s linear infinite' 
                           }} />
-                          <span style={{ fontSize: 14, color: '#0369a1', fontWeight: 500 }}>Scanning image for QR codes...</span>
+                          <span style={{ fontSize: 14, color: '#0369a1', fontWeight: 500 }}>{t('scanner.scanningImage')}</span>
                         </div>
                       </motion.div>
                     )}
@@ -616,7 +623,7 @@ export default function Scanner() {
                     <div id="qr-reader" style={{ width: '100%', border: 'none' }}></div>
                   </div>
                   <button onClick={stopBarcodeScanner} style={{ width: '100%', padding: '16px', background: '#f8f9fa', color: '#1a1a2e', fontWeight: 600, borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 16, marginTop: 16, fontFamily: 'inherit' }}>
-                    Cancel
+                    {t('scanner.cancel')}
                   </button>
                 </div>
               )}
@@ -645,32 +652,32 @@ export default function Scanner() {
               style={{ background: 'white', borderRadius: 24, border: '1px solid #f1f3f5', padding: 24, boxShadow: '0 24px 80px rgba(0,0,0,0.05)' }}>
               
               <div style={{ padding: 16, background: '#f8f9fa', borderRadius: 16, marginBottom: 24 }}>
-                <p style={{ fontSize: 12, fontWeight: 700, color: '#2d6a4f', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Product Identified</p>
+                <p style={{ fontSize: 12, fontWeight: 700, color: '#2d6a4f', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>{t('scanner.productIdentified')}</p>
                 <h2 style={{ fontSize: 20, fontWeight: 800, color: '#1a1a2e' }}>{product.product_name}</h2>
                 <p style={{ fontSize: 14, color: '#718096' }}>{product.manufacturer}</p>
               </div>
 
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1a1a2e', marginBottom: 16 }}>Step 2: Verify Expiry / Batch</h3>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1a1a2e', marginBottom: 16 }}>{t('scanner.step2Title')}</h3>
               
               {!ocrMode ? (
                 <>
                   <p style={{ fontSize: 14, color: '#718096', marginBottom: 16 }}>
-                    Retail barcodes don't contain expiry dates. To verify safety, please enter the batch ID or expiry date printed on the box, or snap a photo of it.
+                    {t('scanner.step2Desc')}
                   </p>
                   
                   <div style={{ marginBottom: 24 }}>
-                    <input type="text" value={ocrText} onChange={e => setOcrText(e.target.value)} placeholder="e.g. BATCH001 or EXP 05/27"
+                    <input type="text" value={ocrText} onChange={e => setOcrText(e.target.value)} placeholder={t('scanner.inputPlaceholder')}
                       style={{ width: '100%', padding: '16px', background: '#f8f9fa', border: '2px solid #e2e8f0', borderRadius: 12, fontSize: 16, color: '#1a1a2e', outline: 'none', marginBottom: 12, fontFamily: 'inherit', boxSizing: 'border-box' }} />
                     <button onClick={startOcrCamera} style={{ width: '100%', padding: '16px', background: '#e2e8f0', color: '#1a1a2e', fontWeight: 600, borderRadius: 12, border: 'none', cursor: 'pointer', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit' }}>
-                      <HiOutlineCamera style={{ width: 20, height: 20 }} /> Scan Text via Camera
+                      <HiOutlineCamera style={{ width: 20, height: 20 }} /> {t('scanner.scanTextCamera')}
                     </button>
                   </div>
 
-                  {isOcrProcessing && <p style={{ textAlign: 'center', color: '#718096', marginBottom: 16 }}>Extracting text... please wait.</p>}
+                  {isOcrProcessing && <p style={{ textAlign: 'center', color: '#718096', marginBottom: 16 }}>{t('scanner.extractingText')}</p>}
 
                   <div style={{ display: 'flex', gap: 12 }}>
                     <button onClick={resolveBatch} disabled={!ocrText} style={{ flex: 1, padding: '16px', background: '#2d6a4f', color: 'white', fontWeight: 600, borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 16, opacity: ocrText ? 1 : 0.5, fontFamily: 'inherit' }}>
-                      Verify Status
+                      {t('scanner.verifyStatus')}
                     </button>
                     <button onClick={resetAll} style={{ padding: '16px', background: '#fef2f2', color: '#dc2626', borderRadius: 16, border: 'none', cursor: 'pointer' }}>
                       <HiOutlineXMark style={{ width: 24, height: 24 }} />
@@ -679,21 +686,21 @@ export default function Scanner() {
                 </>
               ) : (
                 <div style={{ textAlign: 'center' }}>
-                  <p style={{ fontSize: 14, color: '#718096', marginBottom: 16 }}>Point your camera at the Batch/Expiry text</p>
+                  <p style={{ fontSize: 14, color: '#718096', marginBottom: 16 }}>{t('scanner.pointCamera')}</p>
 
                   <div style={{ position: 'relative', background: 'black', borderRadius: 16, overflow: 'hidden', minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
                     <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', opacity: ocrLoading ? 0 : 1, transition: 'opacity 0.3s ease' }} />
                     {ocrLoading && <div style={{ position: 'absolute', inset: 0, background: '#2d3748', animation: 'pulse 2s infinite' }} />}
-                    {ocrLoading && <span style={{ position: 'absolute', color: '#a0aec0', fontSize: 14, fontWeight: 500 }}>Preparing camera...</span>}
+                    {ocrLoading && <span style={{ position: 'absolute', color: '#a0aec0', fontSize: 14, fontWeight: 500 }}>{t('scanner.preparingCamera')}</span>}
                   </div>
                   
                   <canvas ref={canvasRef} style={{ display: 'none' }} />
                   <div style={{ display: 'flex', gap: 12 }}>
                     <button onClick={captureOcr} disabled={isOcrProcessing || ocrLoading} style={{ flex: 1, padding: '16px', background: '#2d6a4f', color: 'white', fontWeight: 600, borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 16, transition: 'background 0.2s', fontFamily: 'inherit' }}>
-                      {isOcrProcessing ? 'Extracting...' : 'Snap Photo'}
+                      {isOcrProcessing ? t('scanner.extracting') : t('scanner.snapPhoto')}
                     </button>
                     <button onClick={stopOcrCamera} style={{ padding: '16px', background: '#f8f9fa', color: '#1a1a2e', borderRadius: 16, border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
-                      Cancel
+                      {t('scanner.cancel')}
                     </button>
                   </div>
                 </div>
@@ -713,17 +720,17 @@ export default function Scanner() {
               <p style={{ fontSize: 16, color: '#4a5568', marginBottom: 32 }}>{st.msg}</p>
 
               <div style={{ textAlign: 'left', background: '#f8f9fa', borderRadius: 16, padding: 20, marginBottom: 24 }}>
-                <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e', marginBottom: 12 }}>Product Details</h3>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e', marginBottom: 12 }}>{t('scanner.productDetails')}</h3>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ color: '#718096', fontSize: 14 }}>Name</span>
+                  <span style={{ color: '#718096', fontSize: 14 }}>{t('scanner.name')}</span>
                   <span style={{ fontWeight: 600, color: '#1a1a2e', fontSize: 14 }}>{product?.medicine_name || product?.product_name || resolvedBatch?.product_name}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ color: '#718096', fontSize: 14 }}>Batch</span>
+                  <span style={{ color: '#718096', fontSize: 14 }}>{t('scanner.batch')}</span>
                   <span style={{ fontWeight: 600, color: '#1a1a2e', fontSize: 14 }}>{resolvedBatch.batch_id}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#718096', fontSize: 14 }}>Expiry</span>
+                  <span style={{ color: '#718096', fontSize: 14 }}>{t('scanner.expiry')}</span>
                   <span style={{ fontWeight: 600, color: '#1a1a2e', fontSize: 14 }}>{resolvedBatch.exp_date}</span>
                 </div>
               </div>
@@ -732,26 +739,26 @@ export default function Scanner() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', background: '#f0fdf4', color: '#166534', borderRadius: 12, fontSize: 13, fontWeight: 600, border: '1px solid #bbf7d0' }}>
                   <HiOutlineShieldCheck style={{ width: 18, height: 18 }} />
-                  Authenticity Guaranteed
+                  {t('scanner.authenticity')}
                 </div>
                 {resolvedBatch.cellScanned && (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', background: '#f8fafc', color: '#334155', borderRadius: 12, fontSize: 13, fontWeight: 600, border: '1px solid #e2e8f0' }}>
-                    Tablet {resolvedBatch.cellScanned} of Strip {resolvedBatch.stripScanned}
+                    {t('scanner.tablet')} {resolvedBatch.cellScanned} {t('scanner.ofStrip')} {resolvedBatch.stripScanned}
                   </div>
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', background: '#e0f2fe', color: '#0369a1', borderRadius: 12, fontSize: 13, fontWeight: 600, border: '1px solid #bae6fd' }}>
                   <HiOutlineCheckBadge style={{ width: 18, height: 18 }} />
-                  Verified Manufacturer Data
+                  {t('scanner.verifiedManufacturer')}
                 </div>
               </div>
 
               <button onClick={readAloud} style={{ width: '100%', padding: '16px', background: '#e0e7ff', color: '#4338ca', fontWeight: 600, borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 16, marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit' }}>
                 <HiOutlineSpeakerWave style={{ width: 24, height: 24 }} />
-                Read Aloud
+                {t('scanner.readAloud')}
               </button>
 
               <button onClick={resetAll} style={{ width: '100%', padding: '16px', background: '#1a1a2e', color: 'white', fontWeight: 600, borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 16, fontFamily: 'inherit' }}>
-                Scan Another Product
+                {t('scanner.scanAnother')}
               </button>
             </motion.div>
           )}

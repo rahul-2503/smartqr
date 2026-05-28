@@ -1,24 +1,27 @@
 import { motion } from 'framer-motion';
 import { HiOutlineCloudArrowUp, HiOutlineQrCode, HiOutlineDevicePhoneMobile } from 'react-icons/hi2';
-
-const steps = [
-  { icon: HiOutlineCloudArrowUp, step: '01', title: 'Upload Product Data', description: 'Manufacturers enter product details — name, batch number, dates, and safety instructions — through a clean dashboard.', iconBg: '#eff6ff', iconColor: '#3b82f6', border: '#dbeafe' },
-  { icon: HiOutlineQrCode, step: '02', title: 'Generate Smart QR', description: 'A unique QR code is generated for each batch. Download it, print it, and attach it to your packaging.', iconBg: '#f0fdf4', iconColor: '#2d6a4f', border: '#d8f3dc' },
-  { icon: HiOutlineDevicePhoneMobile, step: '03', title: 'Scan & Know Instantly', description: 'Consumers scan the QR with their phone. Product details, expiry status, and voice readout — instantly.', iconBg: '#fffbeb', iconColor: '#d97706', border: '#fde68a' },
-];
+import { useLanguage } from '../../i18n/LanguageContext';
 
 export default function HowItWorks() {
+  const { t } = useLanguage();
+
+  const steps = [
+    { icon: HiOutlineCloudArrowUp, step: '01', title: t('howItWorks.step1Title'), description: t('howItWorks.step1Desc'), iconBg: '#eff6ff', iconColor: '#3b82f6', border: '#dbeafe' },
+    { icon: HiOutlineQrCode, step: '02', title: t('howItWorks.step2Title'), description: t('howItWorks.step2Desc'), iconBg: '#f0fdf4', iconColor: '#2d6a4f', border: '#d8f3dc' },
+    { icon: HiOutlineDevicePhoneMobile, step: '03', title: t('howItWorks.step3Title'), description: t('howItWorks.step3Desc'), iconBg: '#fffbeb', iconColor: '#d97706', border: '#fde68a' },
+  ];
+
   return (
     <section style={{ paddingTop: 'var(--section-padding)', paddingBottom: 'var(--section-padding)', background: '#ffffff' }}>
       <div className="container-main">
         {/* Header */}
         <motion.div initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-100px' }} transition={{ duration: 0.7 }}
           style={{ textAlign: 'center', maxWidth: '520px', margin: '0 auto 80px' }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#2d6a4f', textTransform: 'uppercase', letterSpacing: '0.2em' }}>How it works</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#2d6a4f', textTransform: 'uppercase', letterSpacing: '0.2em' }}>{t('howItWorks.label')}</span>
           <h2 style={{ marginTop: 20, fontSize: 'clamp(1.75rem, 4vw, 2.75rem)', fontWeight: 800, color: '#1a1a2e', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
-            Three steps.<br />Zero confusion.
+            {t('howItWorks.heading1')}<br />{t('howItWorks.heading2')}
           </h2>
-          <p style={{ marginTop: 20, fontSize: 16, color: '#718096', lineHeight: 1.7 }}>From manufacturer to consumer — a seamless flow of product transparency.</p>
+          <p style={{ marginTop: 20, fontSize: 16, color: '#718096', lineHeight: 1.7 }}>{t('howItWorks.subtitle')}</p>
         </motion.div>
 
         {/* Steps */}

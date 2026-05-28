@@ -1,26 +1,29 @@
 import { motion } from 'framer-motion';
 import { HiOutlineShieldCheck, HiOutlineSpeakerWave, HiOutlineBellAlert, HiOutlineGlobeAlt, HiOutlineEye, HiOutlineChartBarSquare } from 'react-icons/hi2';
-
-const features = [
-  { icon: HiOutlineShieldCheck, title: 'Product Verification', description: 'Instantly verify product authenticity and batch details by scanning the QR code.', iconBg: '#f0fdf4', iconColor: '#16a34a' },
-  { icon: HiOutlineSpeakerWave, title: 'Voice Accessibility', description: 'Tap the voice button to hear product details spoken aloud. Designed for elderly and visually challenged users.', iconBg: '#eff6ff', iconColor: '#3b82f6' },
-  { icon: HiOutlineBellAlert, title: 'Expiry Intelligence', description: 'Real-time expiry calculation with color-coded status — Safe, Expiring Soon, or Expired.', iconBg: '#fffbeb', iconColor: '#d97706' },
-  { icon: HiOutlineGlobeAlt, title: 'Cloud-Powered', description: 'Built on Azure Cosmos DB with serverless functions. Lightning-fast lookups with enterprise security.', iconBg: '#faf5ff', iconColor: '#9333ea' },
-  { icon: HiOutlineEye, title: 'Product Traceability', description: 'Full batch-level traceability — know who made it, when, and when it expires.', iconBg: '#fff1f2', iconColor: '#e11d48' },
-  { icon: HiOutlineChartBarSquare, title: 'Manufacturer Dashboard', description: 'A powerful yet simple dashboard to manage products, generate QR codes, and track lifecycles.', iconBg: '#ecfeff', iconColor: '#0891b2' },
-];
+import { useLanguage } from '../../i18n/LanguageContext';
 
 export default function Features() {
+  const { t } = useLanguage();
+
+  const features = [
+    { icon: HiOutlineShieldCheck, title: t('features.f1Title'), description: t('features.f1Desc'), iconBg: '#f0fdf4', iconColor: '#16a34a' },
+    { icon: HiOutlineSpeakerWave, title: t('features.f2Title'), description: t('features.f2Desc'), iconBg: '#eff6ff', iconColor: '#3b82f6' },
+    { icon: HiOutlineBellAlert, title: t('features.f3Title'), description: t('features.f3Desc'), iconBg: '#fffbeb', iconColor: '#d97706' },
+    { icon: HiOutlineGlobeAlt, title: t('features.f4Title'), description: t('features.f4Desc'), iconBg: '#faf5ff', iconColor: '#9333ea' },
+    { icon: HiOutlineEye, title: t('features.f5Title'), description: t('features.f5Desc'), iconBg: '#fff1f2', iconColor: '#e11d48' },
+    { icon: HiOutlineChartBarSquare, title: t('features.f6Title'), description: t('features.f6Desc'), iconBg: '#ecfeff', iconColor: '#0891b2' },
+  ];
+
   return (
     <section style={{ paddingTop: 'var(--section-padding)', paddingBottom: 'var(--section-padding)', background: '#f8f9fa' }}>
       <div className="container-main">
         <motion.div initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-100px' }} transition={{ duration: 0.7 }}
           style={{ textAlign: 'center', maxWidth: '520px', margin: '0 auto 80px' }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#2d6a4f', textTransform: 'uppercase', letterSpacing: '0.2em' }}>Capabilities</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#2d6a4f', textTransform: 'uppercase', letterSpacing: '0.2em' }}>{t('features.label')}</span>
           <h2 style={{ marginTop: 20, fontSize: 'clamp(1.75rem, 4vw, 2.75rem)', fontWeight: 800, color: '#1a1a2e', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
-            Everything you need for<br />product safety.
+            {t('features.heading1')}<br />{t('features.heading2')}
           </h2>
-          <p style={{ marginTop: 20, fontSize: 16, color: '#718096', lineHeight: 1.7 }}>A complete ecosystem connecting manufacturers with consumers through smart, accessible technology.</p>
+          <p style={{ marginTop: 20, fontSize: 16, color: '#718096', lineHeight: 1.7 }}>{t('features.subtitle')}</p>
         </motion.div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '24px' }}>

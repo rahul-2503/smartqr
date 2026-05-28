@@ -1,14 +1,17 @@
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { HiOutlineSpeakerWave, HiOutlineHandRaised, HiOutlineLanguage } from 'react-icons/hi2';
-
-const points = [
-  { icon: HiOutlineSpeakerWave, title: 'Voice Readout', description: 'Tap the speaker button to hear all product details spoken aloud. Perfect for visually challenged and elderly users.' },
-  { icon: HiOutlineHandRaised, title: 'Large, Clear Interface', description: 'Big buttons, clear text, color-coded badges. No tiny fonts, no confusing layouts.' },
-  { icon: HiOutlineLanguage, title: 'Simple & Universal', description: 'No login required. Just scan and know. Works on any phone with a camera.' },
-];
+import { useLanguage } from '../../i18n/LanguageContext';
 
 export default function ForConsumers() {
+  const { t } = useLanguage();
+
+  const points = [
+    { icon: HiOutlineSpeakerWave, title: t('forConsumers.p1Title'), description: t('forConsumers.p1Desc') },
+    { icon: HiOutlineHandRaised, title: t('forConsumers.p2Title'), description: t('forConsumers.p2Desc') },
+    { icon: HiOutlineLanguage, title: t('forConsumers.p3Title'), description: t('forConsumers.p3Desc') },
+  ];
+
   return (
     <section style={{ paddingTop: 'var(--section-padding)', paddingBottom: 'var(--section-padding)', background: '#f8f9fa' }}>
       <div className="container-main">
@@ -29,7 +32,7 @@ export default function ForConsumers() {
                   </div>
 
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px 20px 20px' }}>
-                    <p style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.15em' }}>Scan QR Code</p>
+                    <p style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.15em' }}>{t('forConsumers.mockupScan')}</p>
 
                     {/* Viewfinder */}
                     <div style={{ position: 'relative', width: 160, height: 160, marginBottom: 20 }}>
@@ -54,14 +57,14 @@ export default function ForConsumers() {
                           <p style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e' }}>Paracetamol 500mg</p>
                           <p style={{ fontSize: 10, color: '#a0aec0' }}>Sun Pharma</p>
                         </div>
-                        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 10px', background: '#f0fdf4', color: '#166534', borderRadius: 999 }}>Safe</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 10px', background: '#f0fdf4', color: '#166534', borderRadius: 999 }}>{t('forConsumers.mockupSafe')}</span>
                       </div>
                       <div style={{ display: 'flex', gap: 24, marginTop: 8 }}>
-                        <div><p style={{ fontSize: 9, color: '#a0aec0', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Expires</p><p style={{ fontSize: 12, fontWeight: 700, color: '#1a1a2e' }}>Jan 2026</p></div>
-                        <div><p style={{ fontSize: 9, color: '#a0aec0', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Days Left</p><p style={{ fontSize: 12, fontWeight: 700, color: '#2d6a4f' }}>231</p></div>
+                        <div><p style={{ fontSize: 9, color: '#a0aec0', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{t('forConsumers.mockupExpires')}</p><p style={{ fontSize: 12, fontWeight: 700, color: '#1a1a2e' }}>Jan 2026</p></div>
+                        <div><p style={{ fontSize: 9, color: '#a0aec0', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{t('forConsumers.mockupDaysLeft')}</p><p style={{ fontSize: 12, fontWeight: 700, color: '#2d6a4f' }}>231</p></div>
                       </div>
                       <button style={{ width: '100%', marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 0', background: '#2d6a4f', color: 'white', borderRadius: 12, fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer' }}>
-                        <HiOutlineSpeakerWave style={{ width: 14, height: 14 }} /> Read Aloud
+                        <HiOutlineSpeakerWave style={{ width: 14, height: 14 }} /> {t('forConsumers.mockupReadAloud')}
                       </button>
                     </motion.div>
                   </div>
@@ -72,12 +75,12 @@ export default function ForConsumers() {
 
           {/* Right — Content */}
           <motion.div initial={{ opacity: 0, x: 30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true, margin: '-100px' }} transition={{ duration: 0.7, delay: 0.15 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#2d6a4f', textTransform: 'uppercase', letterSpacing: '0.2em' }}>For Consumers</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#2d6a4f', textTransform: 'uppercase', letterSpacing: '0.2em' }}>{t('forConsumers.label')}</span>
             <h2 style={{ marginTop: 20, fontSize: 'clamp(1.75rem, 3.5vw, 2.5rem)', fontWeight: 800, color: '#1a1a2e', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
-              Designed for everyone.<br />Especially those who<br />need it most.
+              {t('forConsumers.heading')}
             </h2>
             <p style={{ marginTop: 20, fontSize: 16, color: '#718096', lineHeight: 1.7, maxWidth: 420 }}>
-              We built SmartQR with accessibility at its core — because product safety is a right, not a privilege.
+              {t('forConsumers.subtitle')}
             </p>
 
             <div style={{ marginTop: 40, display: 'flex', flexDirection: 'column', gap: 28 }}>
@@ -97,7 +100,7 @@ export default function ForConsumers() {
 
             <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.5 }} style={{ marginTop: 40 }}>
               <Link to="/scan" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 24px', background: '#2d6a4f', color: 'white', fontWeight: 600, borderRadius: 12, textDecoration: 'none', boxShadow: '0 4px 16px rgba(45,106,79,0.25)' }}>
-                Try Scanning Now
+                {t('forConsumers.ctaButton')}
               </Link>
             </motion.div>
           </motion.div>
