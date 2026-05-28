@@ -19,6 +19,19 @@ function getStatus(t) {
   };
 }
 
+const calculateDaysLeft = (expDateStr) => {
+  if (!expDateStr) return 0;
+  const expDate = new Date(expDateStr);
+  const today = new Date();
+  return Math.floor((expDate - today) / (1000 * 60 * 60 * 24));
+};
+
+const getStatusForDays = (daysLeft) => {
+  if (daysLeft < 0) return 'EXPIRED';
+  if (daysLeft <= 90) return 'EXPIRING_SOON';
+  return 'SAFE';
+};
+
 export default function Scanner() {
   const { t, speechLang, lang } = useLanguage();
   const STATUS = getStatus(t);
@@ -282,7 +295,9 @@ export default function Scanner() {
         if (!res.ok) throw new Error(data.error || "Batch not found");
         
         setProduct(data.product);
-        setResolvedBatch({ ...data.batch, cellScanned: qrData.cell, stripScanned: qrData.strip });
+        const dL = calculateDaysLeft(data.batch.exp_date);
+        const stDays = getStatusForDays(dL);
+        setResolvedBatch({ ...data.batch, days_left: dL, status: stDays, cellScanned: qrData.cell, stripScanned: qrData.strip });
         setStep('RESULT');
         return;
       }
@@ -311,7 +326,9 @@ export default function Scanner() {
         if (!res.ok) throw new Error(data.error || "Batch not found");
         
         setProduct(data.product);
-        setResolvedBatch(data.batch);
+        const dL = calculateDaysLeft(data.batch.exp_date);
+        const stDays = getStatusForDays(dL);
+        setResolvedBatch({ ...data.batch, days_left: dL, status: stDays });
         setStep('RESULT');
         return;
       }
@@ -522,7 +539,9 @@ export default function Scanner() {
       }
     }
 
-    setResolvedBatch(matchedBatch);
+    const dL = calculateDaysLeft(matchedBatch.exp_date);
+    const stDays = getStatusForDays(dL);
+    setResolvedBatch({ ...matchedBatch, days_left: dL, status: stDays });
     setStep('RESULT');
   };
 
@@ -764,10 +783,20 @@ export default function Scanner() {
                     <span style={{ fontWeight: 600, color: '#1a1a2e', fontSize: 14, textAlign: 'right' }}>{resolvedBatch.mfg_date}</span>
                   </div>
                 )}
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ color: '#718096', fontSize: 14 }}>{t('scanner.expiry')}</span>
                   <span style={{ fontWeight: 600, color: '#1a1a2e', fontSize: 14, textAlign: 'right' }}>{resolvedBatch.exp_date}</span>
                 </div>
+                {resolvedBatch.days_left !== undefined && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#718096', fontSize: 14 }}>
+                      {resolvedBatch.days_left >= 0 ? t('productDetail.daysRemaining') : t('productDetail.daysSinceExpiry')}
+                    </span>
+                    <span style={{ fontWeight: 600, color: '#1a1a2e', fontSize: 14, textAlign: 'right' }}>
+                      {Math.abs(resolvedBatch.days_left)}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Trust & Verification Badges */}
