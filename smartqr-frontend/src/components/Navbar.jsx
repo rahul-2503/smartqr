@@ -74,9 +74,7 @@ export default function Navbar() {
 
         {/* CTA + Language Switcher */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="nav-desktop">
-            <LanguageSwitcher />
-          </div>
+          <LanguageSwitcher />
           <Link
             to="/scan"
             className="nav-desktop"
@@ -126,9 +124,7 @@ export default function Navbar() {
                   {link.label}
                 </Link>
               ))}
-              <div style={{ padding: '12px 16px' }}>
-                <LanguageSwitcher inline={true} />
-              </div>
+
             </div>
           </motion.div>
         )}
