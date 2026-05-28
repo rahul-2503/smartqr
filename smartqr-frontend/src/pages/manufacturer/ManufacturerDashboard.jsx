@@ -1,34 +1,44 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   HiOutlineCube, HiOutlineArchiveBox, HiOutlineQrCode,
   HiOutlineExclamationTriangle, HiOutlineArrowRight,
   HiOutlineShieldCheck, HiOutlineDocumentText, HiOutlineSparkles,
-  HiOutlineArrowTrendingUp, HiOutlineCalendar
+  HiOutlineArrowTrendingUp, HiOutlineCalendar, HiOutlineMapPin,
+  HiOutlineBell, HiOutlineSignal
 } from 'react-icons/hi2';
 import { useAuth } from '../../context/AuthContext';
-import { getOrgProducts, getAuditLogs } from '../../api/manufacturerApi';
+import {
+  getOrgProducts,
+  getAuditLogs,
+  getScanAnalytics,
+  negotiateSignalR
+} from '../../api/manufacturerApi';
+import { HubConnectionBuilder } from '@microsoft/signalr';
+import Chart from 'chart.js/auto';
 import '../../manufacturer.css';
-
-// SVG Chart Data & Tooltips
-const CHART_POINTS = [
-  { day: 'Mon', scans: 145 },
-  { day: 'Tue', scans: 232 },
-  { day: 'Wed', scans: 198 },
-  { day: 'Thu', scans: 312 },
-  { day: 'Fri', scans: 280 },
-  { day: 'Sat', scans: 490 },
-  { day: 'Sun', scans: 560 }
-];
 
 export default function ManufacturerDashboard() {
   const { organization, user } = useAuth();
   const [products, setProducts] = useState([]);
   const [batches, setBatches] = useState([]);
   const [auditLogs, setAuditLogsList] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeChartIndex, setActiveChartIndex] = useState(6); // Default to Sun
+  const [expiryTab, setExpiryTab] = useState('30'); // '30' | '60' | '90'
+  const [connectionType, setConnectionType] = useState('none'); // 'signalr' | 'polling' | 'none'
+  const [toast, setToast] = useState(null);
+
+  // Canvas Refs
+  const lineCanvasRef = useRef(null);
+  const donutCanvasRef = useRef(null);
+  const barCanvasRef = useRef(null);
+
+  // Chart Instance Refs
+  const lineChartInstance = useRef(null);
+  const donutChartInstance = useRef(null);
+  const barChartInstance = useRef(null);
 
   useEffect(() => {
     loadDashboard();
@@ -36,13 +46,20 @@ export default function ManufacturerDashboard() {
 
   const loadDashboard = async () => {
     try {
-      const [prodData, logData] = await Promise.all([
-        getOrgProducts(),
-        getAuditLogs().catch(() => ({ logs: [] }))
+      const [prodData, logData, analyticsData] = await Promise.all([
+        getOrgProducts().catch(() => ({ products: [], batches: [] })),
+        getAuditLogs().catch(() => ({ logs: [] })),
+        getScanAnalytics().catch((err) => {
+          console.error('Scan analytics failed to load:', err);
+          return null;
+        })
       ]);
       setProducts(prodData.products || []);
       setBatches(prodData.batches || []);
       setAuditLogsList(logData.logs || []);
+      if (analyticsData) {
+        setAnalytics(analyticsData);
+      }
     } catch (err) {
       console.error('Dashboard load error:', err);
     } finally {
@@ -50,15 +67,325 @@ export default function ManufacturerDashboard() {
     }
   };
 
+  // SignalR & Polling integration
+  useEffect(() => {
+    if (loading) return;
+
+    let connection = null;
+    let pollInterval = null;
+
+    const showNotification = (scan) => {
+      setToast(scan);
+      setTimeout(() => {
+        setToast(null);
+      }, 4000);
+    };
+
+    const setupRealtime = async () => {
+      try {
+        const connInfo = await negotiateSignalR();
+        if (connInfo && connInfo.url && connInfo.accessToken) {
+          connection = new HubConnectionBuilder()
+            .withUrl(connInfo.url, {
+              accessTokenFactory: () => connInfo.accessToken
+            })
+            .withAutomaticReconnect()
+            .build();
+
+          connection.on('newScan', (newScanEvent) => {
+            console.log('Real-time scan received:', newScanEvent);
+            showNotification(newScanEvent);
+
+            setAnalytics((prev) => {
+              if (!prev) return prev;
+
+              // Update total scans
+              const totalScans = prev.totalScans + 1;
+
+              // Prepend to recentActivity
+              const recentActivity = [newScanEvent, ...prev.recentActivity].slice(0, 10);
+
+              // Update daily volume for today
+              const todayStr = new Date().toISOString().split('T')[0];
+              const dailyScanVolume = prev.dailyScanVolume.map((bucket) => {
+                if (bucket.date === todayStr) {
+                  return { ...bucket, scans: bucket.scans + 1 };
+                }
+                return bucket;
+              });
+
+              // Update topScannedProducts
+              const prodName = newScanEvent.productName || 'Unknown Product';
+              let topScannedProducts = [...prev.topScannedProducts];
+              const existingProd = topScannedProducts.find((p) => p.name === prodName);
+              if (existingProd) {
+                existingProd.scans += 1;
+              } else {
+                topScannedProducts.push({ name: prodName, scans: 1 });
+              }
+              topScannedProducts.sort((a, b) => b.scans - a.scans);
+
+              // Update geoDistribution
+              const locKey = `${newScanEvent.city}, ${newScanEvent.country}`;
+              let geoDistribution = [...prev.geoDistribution];
+              const existingGeo = geoDistribution.find(
+                (g) => `${g.city}, ${g.country}` === locKey
+              );
+              if (existingGeo) {
+                existingGeo.scans += 1;
+              } else if (newScanEvent.city && newScanEvent.city !== 'Unknown City') {
+                geoDistribution.push({
+                  city: newScanEvent.city,
+                  country: newScanEvent.country,
+                  scans: 1,
+                  latitude: newScanEvent.latitude,
+                  longitude: newScanEvent.longitude
+                });
+              }
+              geoDistribution.sort((a, b) => b.scans - a.scans);
+
+              return {
+                ...prev,
+                totalScans,
+                recentActivity,
+                dailyScanVolume,
+                topScannedProducts,
+                geoDistribution
+              };
+            });
+          });
+
+          await connection.start();
+          setConnectionType('signalr');
+        } else {
+          throw new Error('SignalR negotiation returned empty response.');
+        }
+      } catch (err) {
+        console.warn('SignalR negotiation failed, falling back to short polling:', err);
+        setConnectionType('polling');
+
+        pollInterval = setInterval(async () => {
+          try {
+            const data = await getScanAnalytics();
+            if (data) {
+              setAnalytics(data);
+            }
+          } catch (pollErr) {
+            console.error('Polling error:', pollErr);
+          }
+        }, 5000);
+      }
+    };
+
+    setupRealtime();
+
+    return () => {
+      if (connection) {
+        connection.stop().catch((err) => console.error('Error stopping SignalR connection:', err));
+      }
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    };
+  }, [loading]);
+
+  // Chart Rendering Effect
+  useEffect(() => {
+    if (!analytics) return;
+
+    // 1. Line Chart: Verification Activity
+    if (lineCanvasRef.current) {
+      if (lineChartInstance.current) lineChartInstance.current.destroy();
+
+      const labels = analytics.dailyScanVolume.map((d) => d.day);
+      const data = analytics.dailyScanVolume.map((d) => d.scans);
+
+      lineChartInstance.current = new Chart(lineCanvasRef.current, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Consumer Verification Scans',
+              data,
+              borderColor: '#09090b',
+              backgroundColor: 'rgba(9, 9, 11, 0.03)',
+              borderWidth: 2.5,
+              tension: 0.3,
+              fill: true,
+              pointBackgroundColor: '#09090b',
+              pointHoverRadius: 6
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              padding: 10,
+              displayColors: false,
+              backgroundColor: '#09090b',
+              titleFont: { family: 'Plus Jakarta Sans', size: 12, weight: 'bold' },
+              bodyFont: { family: 'Plus Jakarta Sans', size: 12 }
+            }
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { font: { family: 'Plus Jakarta Sans', size: 11 } }
+            },
+            y: {
+              beginAtZero: true,
+              ticks: {
+                stepSize: 1,
+                font: { family: 'Plus Jakarta Sans', size: 11 }
+              },
+              grid: { color: '#f4f4f5' }
+            }
+          }
+        }
+      });
+    }
+
+    // 2. Donut Chart: Status Breakdown
+    if (donutCanvasRef.current) {
+      if (donutChartInstance.current) donutChartInstance.current.destroy();
+
+      const { safe, expiring, expired } = analytics.statusBreakdown;
+
+      donutChartInstance.current = new Chart(donutCanvasRef.current, {
+        type: 'doughnut',
+        data: {
+          labels: ['Safe', 'Expiring Soon', 'Expired'],
+          datasets: [
+            {
+              data: [safe, expiring, expired],
+              backgroundColor: ['#10b981', '#f59e0b', '#dc2626'],
+              borderWidth: 2,
+              borderColor: '#ffffff',
+              hoverOffset: 4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                font: { family: 'Plus Jakarta Sans', size: 11, weight: '500' },
+                padding: 12,
+                usePointStyle: true,
+                pointStyle: 'circle'
+              }
+            },
+            tooltip: {
+              padding: 10,
+              titleFont: { family: 'Plus Jakarta Sans', size: 12, weight: 'bold' },
+              bodyFont: { family: 'Plus Jakarta Sans', size: 12 }
+            }
+          },
+          cutout: '65%'
+        }
+      });
+    }
+
+    // 3. Bar Chart: Top Scanned Products
+    if (barCanvasRef.current) {
+      if (barChartInstance.current) barChartInstance.current.destroy();
+
+      const labels = analytics.topScannedProducts.map((p) => p.name);
+      const data = analytics.topScannedProducts.map((p) => p.scans);
+
+      barChartInstance.current = new Chart(barCanvasRef.current, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Scans',
+              data,
+              backgroundColor: 'rgba(9, 9, 11, 0.85)',
+              hoverBackgroundColor: '#09090b',
+              borderRadius: 6,
+              borderWidth: 0,
+              barThickness: 20
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          indexAxis: 'y',
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              padding: 10,
+              titleFont: { family: 'Plus Jakarta Sans', size: 12, weight: 'bold' },
+              bodyFont: { family: 'Plus Jakarta Sans', size: 12 }
+            }
+          },
+          scales: {
+            x: {
+              beginAtZero: true,
+              ticks: {
+                stepSize: 1,
+                font: { family: 'Plus Jakarta Sans', size: 11 }
+              },
+              grid: { color: '#f4f4f5' }
+            },
+            y: {
+              grid: { display: false },
+              ticks: { font: { family: 'Plus Jakarta Sans', size: 11 } }
+            }
+          }
+        }
+      });
+    }
+
+    return () => {
+      if (lineChartInstance.current) lineChartInstance.current.destroy();
+      if (donutChartInstance.current) donutChartInstance.current.destroy();
+      if (barChartInstance.current) barChartInstance.current.destroy();
+    };
+  }, [analytics]);
+
   const totalQRs = batches.reduce((sum, b) => sum + (b.total_tablets || 0), 0);
-  const expiringCount = batches.filter(b => b.status === 'EXPIRING_SOON').length;
-  const expiredCount = batches.filter(b => b.status === 'EXPIRED').length;
+  const expiringCount = analytics?.statusBreakdown?.expiring ?? batches.filter(b => b.status === 'EXPIRING_SOON').length;
+  const expiredCount = analytics?.statusBreakdown?.expired ?? batches.filter(b => b.status === 'EXPIRED').length;
 
   const stats = [
-    { label: 'Products Registered', value: products.length, icon: HiOutlineCube, color: '#2563eb', bg: 'rgba(37, 99, 235, 0.05)' },
-    { label: 'Active Batches', value: batches.length, icon: HiOutlineArchiveBox, color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.05)' },
-    { label: 'QR Codes Tracked', value: totalQRs, icon: HiOutlineQrCode, color: '#10b981', bg: 'rgba(16, 185, 129, 0.05)' },
-    { label: 'Critical Alerts', value: expiringCount + expiredCount, icon: HiOutlineExclamationTriangle, color: (expiringCount + expiredCount) > 0 ? '#dc2626' : '#10b981', bg: (expiringCount + expiredCount) > 0 ? 'rgba(220, 38, 38, 0.05)' : 'rgba(16, 185, 129, 0.05)' },
+    {
+      label: 'Products Registered',
+      value: analytics?.totalProducts ?? products.length,
+      icon: HiOutlineCube,
+      color: '#2563eb',
+      bg: 'rgba(37, 99, 235, 0.05)'
+    },
+    {
+      label: 'Active Batches',
+      value: analytics?.totalBatches ?? batches.length,
+      icon: HiOutlineArchiveBox,
+      color: '#8b5cf6',
+      bg: 'rgba(139, 92, 246, 0.05)'
+    },
+    {
+      label: 'Total Scans',
+      value: analytics?.totalScans ?? 0,
+      icon: HiOutlineQrCode,
+      color: '#10b981',
+      bg: 'rgba(16, 185, 129, 0.05)'
+    },
+    {
+      label: 'Critical Alerts',
+      value: expiringCount + expiredCount,
+      icon: HiOutlineExclamationTriangle,
+      color: expiringCount + expiredCount > 0 ? '#dc2626' : '#10b981',
+      bg: expiringCount + expiredCount > 0 ? 'rgba(220, 38, 38, 0.05)' : 'rgba(16, 185, 129, 0.05)'
+    }
   ];
 
   // Helper for batch timeline percentage
@@ -76,6 +403,38 @@ export default function ManufacturerDashboard() {
     }
   };
 
+  const getExpiryProgressByDates = (mfgDate, expDate) => {
+    try {
+      const mfg = new Date(mfgDate);
+      const exp = new Date(expDate);
+      const now = new Date();
+      const total = exp - mfg;
+      if (total <= 0) return 100;
+      const elapsed = now - mfg;
+      return Math.min(100, Math.max(0, Math.round((elapsed / total) * 100)));
+    } catch {
+      return 50;
+    }
+  };
+
+  const cleanUserAgent = (ua) => {
+    if (!ua) return 'Unknown Device';
+    if (ua.includes('iPhone')) return 'iPhone';
+    if (ua.includes('iPad')) return 'iPad';
+    if (ua.includes('Android')) return 'Android Mobile';
+    if (ua.includes('Windows')) return 'Windows PC';
+    if (ua.includes('Macintosh')) return 'Mac PC';
+    if (ua.includes('Linux')) return 'Linux PC';
+    return 'Mobile Device';
+  };
+
+  const activeAlerts =
+    expiryTab === '30'
+      ? analytics?.expiryAlerts?.next30 || []
+      : expiryTab === '60'
+      ? analytics?.expiryAlerts?.next60 || []
+      : analytics?.expiryAlerts?.next90 || []
+
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
@@ -84,31 +443,104 @@ export default function ManufacturerDashboard() {
     );
   }
 
-  // Draw smooth SVG path for scans
-  const svgWidth = 500;
-  const svgHeight = 130;
-  const padding = 20;
-  const pointsCount = CHART_POINTS.length;
-  
-  const pointsString = CHART_POINTS.map((pt, idx) => {
-    const x = padding + (idx * (svgWidth - padding * 2)) / (pointsCount - 1);
-    const maxScans = 600;
-    const y = svgHeight - padding - (pt.scans * (svgHeight - padding * 2)) / maxScans;
-    return `${x},${y}`;
-  }).join(' ');
-
-  const fillPathString = `${padding},${svgHeight - padding} ${pointsString} ${svgWidth - padding},${svgHeight - padding} Z`;
-
   return (
     <div style={{ animation: 'fadeIn 0.4s ease-out' }}>
+      {/* Real-time scan toast notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            style={{
+              position: 'fixed',
+              bottom: '24px',
+              right: '24px',
+              background: '#09090b',
+              color: '#ffffff',
+              padding: '16px 20px',
+              borderRadius: '12px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              border: '1px solid rgba(255,255,255,0.1)'
+            }}
+          >
+            <div
+              style={{
+                background: 'rgba(255,255,255,0.1)',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 32,
+                height: 32
+              }}
+            >
+              <HiOutlineQrCode style={{ color: '#10b981', width: 18, height: 18 }} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '13px' }}>New Scan Verified!</div>
+              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)' }}>
+                {toast.productName} in {toast.city}, {toast.country}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Page Header */}
       <div className="mfr-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <div>
-          <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            Welcome back, {organization?.name || 'Organization'} 
+          <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+            Welcome back, {organization?.name || 'Organization'}
             <HiOutlineSparkles style={{ width: 18, height: 18, color: '#f59e0b' }} />
           </h1>
-          <p style={{ fontSize: '13px' }}>Workspace Administrator • {user?.email}</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+            <p style={{ fontSize: '13px', margin: 0, color: 'var(--mfr-text-muted)' }}>
+              Workspace Administrator • {user?.email}
+            </p>
+            <span style={{ color: '#d4d4d8' }}>•</span>
+            {/* Realtime / Polling pill indicator */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {connectionType === 'signalr' ? (
+                <>
+                  <span
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: '#10b981',
+                      display: 'inline-block',
+                      animation: 'pulse 1.5s infinite'
+                    }}
+                  />
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#10b981' }}>Live SignalR</span>
+                </>
+              ) : connectionType === 'polling' ? (
+                <>
+                  <span
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: '#3b82f6',
+                      display: 'inline-block',
+                      animation: 'pulse 1.5s infinite'
+                    }}
+                  />
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#3b82f6' }}>Auto-Refresh Active</span>
+                </>
+              ) : (
+                <>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#71717a', display: 'inline-block' }} />
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#71717a' }}>Offline Fallback</span>
+                </>
+              )}
+            </div>
+          </div>
         </div>
         <div className="mfr-page-header-actions" style={{ gap: '12px' }}>
           <Link to="/manufacturer/products" className="mfr-btn mfr-btn-outline" style={{ background: '#ffffff' }}>
@@ -135,7 +567,9 @@ export default function ManufacturerDashboard() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
                   <div className="mfr-stat-value">{stat.value.toLocaleString()}</div>
-                  <div className="mfr-stat-label" style={{ color: 'var(--mfr-text-muted)', fontSize: '12px' }}>{stat.label}</div>
+                  <div className="mfr-stat-label" style={{ color: 'var(--mfr-text-muted)', fontSize: '12px' }}>
+                    {stat.label}
+                  </div>
                 </div>
                 <div className="mfr-stat-icon" style={{ background: stat.bg, borderColor: 'transparent', marginBottom: 0 }}>
                   <Icon style={{ width: 18, height: 18, color: stat.color }} />
@@ -150,96 +584,69 @@ export default function ManufacturerDashboard() {
       <div className="mfr-dashboard-grid">
         {/* Left Column: Charts & Batches */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          
           {/* Scan Activity Interactive Chart */}
           <div className="mfr-card">
             <div className="mfr-card-header" style={{ padding: '20px 24px' }}>
               <div>
-                <h3 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <HiOutlineArrowTrendingUp style={{ width: 16, height: 16, color: '#10b981' }} />
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                  <HiOutlineArrowTrendingUp style={{ width: 16, height: 16, color: '#09090b' }} />
                   Verification Activity
                 </h3>
-                <p style={{ fontSize: '11px', color: 'var(--mfr-text-muted)', margin: '2px 0 0' }}>Real-time scans & checks across all distributed QR batches</p>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: '18px', fontWeight: 700, color: 'var(--mfr-text-primary)' }}>
-                  {CHART_POINTS[activeChartIndex].scans} scans
-                </span>
-                <span style={{ fontSize: '11px', color: 'var(--mfr-text-muted)', display: 'block' }}>
-                  on {CHART_POINTS[activeChartIndex].day}
-                </span>
+                <p style={{ fontSize: '11px', color: 'var(--mfr-text-muted)', margin: '2px 0 0' }}>
+                  Real-time consumer verification scans (last 7 days)
+                </p>
               </div>
             </div>
-            <div className="mfr-card-body" style={{ padding: '20px 24px 10px' }}>
-              <div style={{ position: 'relative' }}>
-                <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ width: '100%', height: '140px', overflow: 'visible' }}>
-                  <defs>
-                    <linearGradient id="scansGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#e4e4e7" stopOpacity="0.4" />
-                      <stop offset="100%" stopColor="#e4e4e7" stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                  
-                  {/* Grid Lines */}
-                  <line x1={padding} y1={padding} x2={svgWidth - padding} y2={padding} stroke="#f4f4f5" strokeWidth="1" />
-                  <line x1={padding} y1={svgHeight / 2} x2={svgWidth - padding} y2={svgHeight / 2} stroke="#f4f4f5" strokeWidth="1" />
-                  <line x1={padding} y1={svgHeight - padding} x2={svgWidth - padding} y2={svgHeight - padding} stroke="#e4e4e7" strokeWidth="1" />
+            <div className="mfr-card-body" style={{ padding: '12px 24px 20px' }}>
+              <div style={{ height: '220px', position: 'relative' }}>
+                <canvas ref={lineCanvasRef} />
+              </div>
+            </div>
+          </div>
 
-                  {/* Gradient Area under line */}
-                  <path d={fillPathString} fill="url(#scansGrad)" />
-                  
-                  {/* Line Chart */}
-                  <path d={`M ${pointsString}`} fill="none" stroke="var(--mfr-accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          {/* Secondary Charts row */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
+            {/* Status Breakdown Donut Chart */}
+            <div className="mfr-card">
+              <div className="mfr-card-header" style={{ padding: '16px 20px' }}>
+                <h3 style={{ fontSize: '14px', margin: 0 }}>Batch Status Breakdown</h3>
+              </div>
+              <div className="mfr-card-body" style={{ padding: '12px 20px 16px' }}>
+                <div style={{ height: '180px', position: 'relative' }}>
+                  <canvas ref={donutCanvasRef} />
+                </div>
+              </div>
+            </div>
 
-                  {/* Points */}
-                  {CHART_POINTS.map((pt, idx) => {
-                    const x = padding + (idx * (svgWidth - padding * 2)) / (pointsCount - 1);
-                    const maxScans = 600;
-                    const y = svgHeight - padding - (pt.scans * (svgHeight - padding * 2)) / maxScans;
-                    const isActive = idx === activeChartIndex;
-                    
-                    return (
-                      <g key={pt.day} style={{ cursor: 'pointer' }} onMouseEnter={() => setActiveChartIndex(idx)}>
-                        {/* Invisible hover helper */}
-                        <circle cx={x} cy={y} r="16" fill="transparent" />
-                        {/* Real dot */}
-                        <circle 
-                          cx={x} 
-                          cy={y} 
-                          r={isActive ? "5" : "3.5"} 
-                          fill={isActive ? "var(--mfr-accent)" : "#ffffff"} 
-                          stroke="var(--mfr-accent)" 
-                          strokeWidth="2" 
-                          style={{ transition: 'all 0.15s ease' }}
-                        />
-                      </g>
-                    );
-                  })}
-                </svg>
-
-                {/* X labels */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 12px', marginTop: '4px' }}>
-                  {CHART_POINTS.map((pt, idx) => (
-                    <span 
-                      key={pt.day} 
-                      style={{ 
-                        fontSize: '11px', 
-                        fontWeight: idx === activeChartIndex ? '700' : '500',
-                        color: idx === activeChartIndex ? 'var(--mfr-text-primary)' : 'var(--mfr-text-muted)',
-                        cursor: 'pointer',
-                        transition: 'color 0.2s'
+            {/* Top Scanned Products Bar Chart */}
+            <div className="mfr-card">
+              <div className="mfr-card-header" style={{ padding: '16px 20px' }}>
+                <h3 style={{ fontSize: '14px', margin: 0 }}>Top Verified Products</h3>
+              </div>
+              <div className="mfr-card-body" style={{ padding: '12px 20px 16px' }}>
+                <div style={{ height: '180px', position: 'relative' }}>
+                  {analytics && analytics.topScannedProducts.length > 0 ? (
+                    <canvas ref={barCanvasRef} />
+                  ) : (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        height: '100%',
+                        fontSize: '12px',
+                        color: 'var(--mfr-text-muted)'
                       }}
-                      onClick={() => setActiveChartIndex(idx)}
                     >
-                      {pt.day}
-                    </span>
-                  ))}
+                      No scan data available.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Recent Batches & Expiry Progress */}
+          {/* Recent Batches Expiry Tracking */}
           <div className="mfr-card">
             <div className="mfr-card-header">
               <h3>Recent Batch Expiry Tracking</h3>
@@ -266,15 +673,20 @@ export default function ManufacturerDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {batches.slice(0, 5).map(b => {
+                      {batches.slice(0, 5).map((b) => {
                         const progress = getExpiryProgress(b);
-                        const progressColor = b.status === 'EXPIRED' ? '#dc2626' : b.status === 'EXPIRING_SOON' ? '#d97706' : '#10b981';
-                        
+                        const progressColor =
+                          b.status === 'EXPIRED' ? '#dc2626' : b.status === 'EXPIRING_SOON' ? '#d97706' : '#10b981';
+
                         return (
                           <tr key={b.batch_id}>
                             <td>
-                              <div style={{ fontWeight: 600, fontSize: '13px', fontFamily: 'monospace' }}>{b.batch_id}</div>
-                              <div style={{ fontSize: '11.5px', color: 'var(--mfr-text-secondary)', marginTop: '2px' }}>{b.product_name}</div>
+                              <div style={{ fontWeight: 600, fontSize: '13px', fontFamily: 'monospace' }}>
+                                {b.batch_id}
+                              </div>
+                              <div style={{ fontSize: '11.5px', color: 'var(--mfr-text-secondary)', marginTop: '2px' }}>
+                                {b.product_name}
+                              </div>
                             </td>
                             <td style={{ fontWeight: 600 }}>{(b.total_tablets || 0).toLocaleString()}</td>
                             <td>
@@ -301,48 +713,242 @@ export default function ManufacturerDashboard() {
               )}
             </div>
           </div>
-
         </div>
 
-        {/* Right Column: Activity Log Timeline */}
+        {/* Right Column: Expiry Alerts & Real-Time Scan Activity Feed */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          
-          <div className="mfr-card" style={{ position: 'sticky', top: '96px' }}>
+          {/* Expiry Alerts Card */}
+          <div className="mfr-card">
+            <div className="mfr-card-header" style={{ padding: '16px 20px', borderBottom: '1px solid var(--mfr-border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                  <HiOutlineBell style={{ width: 16, height: 16, color: '#dc2626' }} />
+                  Batch Expiry Alerts
+                </h3>
+              </div>
+            </div>
+            {/* Tabs */}
+            <div style={{ display: 'flex', background: '#f4f4f5', padding: '4px', borderRadius: '8px', margin: '16px 20px 0' }}>
+              {['30', '60', '90'].map((threshold) => (
+                <button
+                  key={threshold}
+                  onClick={() => setExpiryTab(threshold)}
+                  style={{
+                    flex: 1,
+                    border: 'none',
+                    background: expiryTab === threshold ? '#ffffff' : 'transparent',
+                    color: expiryTab === threshold ? '#09090b' : '#71717a',
+                    fontWeight: 600,
+                    fontSize: '12px',
+                    padding: '6px 0',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    boxShadow: expiryTab === threshold ? '0 1px 3px rgba(0,0,0,0.05)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  &lt; {threshold} Days ({expiryTab === threshold ? activeAlerts.length : (
+                    threshold === '30' ? (analytics?.expiryAlerts?.next30?.length || 0) :
+                    threshold === '60' ? (analytics?.expiryAlerts?.next60?.length || 0) :
+                    (analytics?.expiryAlerts?.next90?.length || 0)
+                  )})
+                </button>
+              ))}
+            </div>
+
+            <div className="mfr-card-body" style={{ padding: '16px 20px', maxHeight: '250px', overflowY: 'auto' }}>
+              {activeAlerts.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 0', textAlign: 'center' }}>
+                  <div
+                    style={{
+                      background: 'rgba(16, 185, 129, 0.05)',
+                      borderRadius: '50%',
+                      width: '40px',
+                      height: '40px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: '10px'
+                    }}
+                  >
+                    <HiOutlineShieldCheck style={{ width: 22, height: 22, color: '#10b981' }} />
+                  </div>
+                  <h4 style={{ fontSize: '13px', margin: 0, fontWeight: 700 }}>All Clear!</h4>
+                  <p style={{ fontSize: '11px', color: 'var(--mfr-text-muted)', margin: '4px 0 0' }}>
+                    No batches expiring within {expiryTab} days.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {activeAlerts.map((alert) => (
+                    <div
+                      key={alert.batchId}
+                      style={{
+                        padding: '12px',
+                        borderRadius: '8px',
+                        background: 'rgba(220, 38, 38, 0.02)',
+                        border: '1px solid rgba(220, 38, 38, 0.1)',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '12.5px', color: 'var(--mfr-text-primary)' }}>
+                          {alert.productName}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: '11px',
+                            color: 'var(--mfr-text-muted)',
+                            fontFamily: 'monospace',
+                            marginTop: '2px'
+                          }}
+                        >
+                          Batch: {alert.batchId}
+                        </div>
+                        <div style={{ fontSize: '10.5px', color: 'var(--mfr-text-secondary)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <HiOutlineCalendar style={{ width: 12, height: 12 }} />
+                          Exp: {new Date(alert.expDate).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span
+                          className={`mfr-badge ${alert.daysLeft <= 15 ? 'mfr-badge-danger' : 'mfr-badge-warning'}`}
+                          style={{ fontSize: '11px', fontWeight: 700, padding: '4px 8px' }}
+                        >
+                          {alert.daysLeft} days left
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Real-time Scan Activity Feed */}
+          <div className="mfr-card">
             <div className="mfr-card-header">
-              <h3 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                <HiOutlineSignal style={{ width: 16, height: 16, color: '#10b981' }} />
+                Real-Time Consumer Scans
+              </h3>
+            </div>
+            <div className="mfr-card-body" style={{ padding: '16px 20px', maxHeight: '350px', overflowY: 'auto' }}>
+              {!analytics || analytics.recentActivity.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--mfr-text-muted)' }}>
+                  <p style={{ fontSize: '13px', margin: 0 }}>No scan activity tracked yet.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {analytics.recentActivity.map((scan) => (
+                    <div
+                      key={scan.id}
+                      style={{
+                        display: 'flex',
+                        gap: '12px',
+                        paddingBottom: '12px',
+                        borderBottom: '1px solid var(--mfr-border)',
+                        position: 'relative'
+                      }}
+                    >
+                      <div
+                        style={{
+                          background: 'var(--mfr-bg-tertiary)',
+                          borderRadius: '8px',
+                          width: '32px',
+                          height: '32px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}
+                      >
+                        <HiOutlineQrCode style={{ width: 16, height: 16, color: 'var(--mfr-text-secondary)' }} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--mfr-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {scan.productName}
+                          </span>
+                          <span style={{ fontSize: '9.5px', color: 'var(--mfr-text-muted)', flexShrink: 0 }}>
+                            {new Date(scan.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            fontSize: '11px',
+                            color: 'var(--mfr-text-secondary)',
+                            fontFamily: 'monospace',
+                            marginTop: '1px'
+                          }}
+                        >
+                          Batch: {scan.batchId}
+                        </div>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            marginTop: '4px',
+                            fontSize: '11px',
+                            color: 'var(--mfr-text-muted)'
+                          }}
+                        >
+                          <HiOutlineMapPin style={{ width: 12, height: 12, color: '#dc2626' }} />
+                          <span>
+                            {scan.city}, {scan.region ? `${scan.region}, ` : ''}{scan.country}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '10px', color: 'var(--mfr-text-muted)', marginTop: '2px' }}>
+                          Device: {cleanUserAgent(scan.userAgent)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Workspace Activity Log */}
+          <div className="mfr-card">
+            <div className="mfr-card-header">
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
                 <HiOutlineDocumentText style={{ width: 16, height: 16, color: 'var(--mfr-text-secondary)' }} />
                 Workspace Activity
               </h3>
             </div>
-            
-            <div className="mfr-card-body" style={{ padding: '20px 24px', maxHeight: '420px', overflowY: 'auto' }}>
+
+            <div className="mfr-card-body" style={{ padding: '20px 24px', maxHeight: '350px', overflowY: 'auto' }}>
               {auditLogs.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--mfr-text-muted)' }}>
-                  <p style={{ fontSize: '13px' }}>No actions logged in this workspace yet.</p>
+                  <p style={{ fontSize: '13px', margin: 0 }}>No actions logged in this workspace yet.</p>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  {auditLogs.slice(0, 8).map((log, idx) => (
+                  {auditLogs.slice(0, 5).map((log, idx) => (
                     <div key={log.id} style={{ position: 'relative', paddingLeft: '22px' }}>
                       {/* Vertical line indicator */}
-                      {idx !== Math.min(auditLogs.length, 8) - 1 && (
+                      {idx !== Math.min(auditLogs.length, 5) - 1 && (
                         <div style={{ position: 'absolute', left: '4px', top: '16px', bottom: '-24px', width: '1.5px', background: '#e4e4e7' }} />
                       )}
                       {/* Timeline dot */}
-                      <div 
-                        style={{ 
-                          position: 'absolute', 
-                          left: '0px', 
-                          top: '4px', 
-                          width: '9px', 
-                          height: '9px', 
-                          borderRadius: '50%', 
-                          background: log.action?.includes('REGISTER') ? '#2563eb' : '#10b981', 
-                          border: '2px solid #ffffff', 
-                          boxShadow: '0 0 0 1px #e4e4e7' 
-                        }} 
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: '0px',
+                          top: '4px',
+                          width: '9px',
+                          height: '9px',
+                          borderRadius: '50%',
+                          background: log.action?.includes('REGISTER') ? '#2563eb' : '#10b981',
+                          border: '2px solid #ffffff',
+                          boxShadow: '0 0 0 1px #e4e4e7'
+                        }}
                       />
-                      
+
                       <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
                           <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--mfr-text-primary)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
@@ -369,16 +975,47 @@ export default function ManufacturerDashboard() {
               )}
             </div>
 
-            <div style={{ padding: '16px 24px', borderTop: '1px solid var(--mfr-border)', background: 'var(--mfr-bg-secondary)', textAlign: 'center' }}>
-              <span style={{ fontSize: '11px', color: 'var(--mfr-text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+            <div
+              style={{
+                padding: '16px 24px',
+                borderTop: '1px solid var(--mfr-border)',
+                background: 'var(--mfr-bg-secondary)',
+                textAlign: 'center'
+              }}
+            >
+              <span
+                style={{
+                  fontSize: '11px',
+                  color: 'var(--mfr-text-muted)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontWeight: 600
+                }}
+              >
                 <HiOutlineShieldCheck style={{ width: 14, height: 14, color: '#10b981' }} />
                 Workspace activity verified
               </span>
             </div>
           </div>
-
         </div>
       </div>
+      <style>{`
+        @keyframes pulse {
+          0% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+          }
+          70% {
+            transform: scale(1);
+            box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+          }
+          100% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+          }
+        }
+      `}</style>
     </div>
   );
 }

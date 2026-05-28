@@ -43,8 +43,12 @@ async function getContainers() {
                 id: "SmartBatches", 
                 partitionKey: { paths: ["/organizationDomain"] } 
             });
+            const { container: scans } = await database.containers.createIfNotExists({ 
+                id: "Scans", 
+                partitionKey: { paths: ["/organizationDomain"] } 
+            });
 
-            return { products, batches, organizations, auditLogs, manufacturers, medicineProducts, smartBatches };
+            return { products, batches, organizations, auditLogs, manufacturers, medicineProducts, smartBatches, scans };
         })();
     }
     return containersPromise;

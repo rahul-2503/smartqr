@@ -1,6 +1,8 @@
 import { auth } from '../config/firebase';
 
-const API_BASE = 'https://smartqr-api-rahul-f8hpaqeudbdeesa5.centralindia-01.azurewebsites.net/api';
+const API_BASE = window.location.hostname === 'localhost'
+  ? 'http://localhost:7071/api'
+  : 'https://smartqr-api-rahul-f8hpaqeudbdeesa5.centralindia-01.azurewebsites.net/api';
 
 // Helper to get token
 async function getAccessToken() {

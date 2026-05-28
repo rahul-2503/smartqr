@@ -131,6 +131,40 @@ export default function ProductDetail() {
           tablets_per_strip: batch.tablets_per_strip,
           total_strips: batch.total_strips,
         });
+
+        // Record scan event in background
+        (async () => {
+          try {
+            let geoData = {};
+            try {
+              const geoRes = await fetch('https://ipapi.co/json/');
+              if (geoRes.ok) geoData = await geoRes.json();
+            } catch (geoErr) {
+              console.warn('Geo IP lookup failed', geoErr);
+            }
+
+            const recordUrl = window.location.hostname === 'localhost'
+              ? 'http://localhost:7071/api/recordscan'
+              : 'https://smartqr-api-rahul-f8hpaqeudbdeesa5.centralindia-01.azurewebsites.net/api/recordscan';
+
+            await fetch(recordUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                batchId: batch.batch_id,
+                productName: product.medicine_name || batch.product_name || 'Unknown Product',
+                organizationDomain: batch.organizationDomain || batch.mfr_id,
+                city: geoData.city || 'Unknown City',
+                region: geoData.region || 'Unknown Region',
+                country: geoData.country_name || geoData.country || 'Unknown Country',
+                latitude: geoData.latitude || null,
+                longitude: geoData.longitude || null
+              })
+            });
+          } catch (scanErr) {
+            console.error('Failed to log scan:', scanErr);
+          }
+        })();
       } catch (err) {
         setError(err.message);
       } finally {
