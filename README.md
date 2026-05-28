@@ -60,6 +60,10 @@ SmartQR handles **4+ real-world product identification scenarios**:
 
 ---
 
+## 🚀 Deployment Link
+You can access the live application here:
+👉 **https://lemon-bay-056bf6a00.7.azurestaticapps.net/**
+
 ## 🏗️ Architecture
 
 ```
