@@ -5,8 +5,10 @@ import dotenv from 'dotenv';
 // Load environment variables from .env
 dotenv.config();
 
-/* Point Playwright to browsers on D: drive */
-process.env.PLAYWRIGHT_BROWSERS_PATH = 'D:\\playwright-browsers';
+/* Point Playwright to browsers on D: drive when running locally on Windows */
+if (process.platform === 'win32' && !process.env.CI) {
+  process.env.PLAYWRIGHT_BROWSERS_PATH = 'D:\\playwright-browsers';
+}
 
 /**
  * SmartQR — Playwright E2E Test Configuration
