@@ -10,7 +10,7 @@ on:
       - main
 
 jobs:
-  build_and_test:
+  build_and_deploy_job:
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
     runs-on: ubuntu-latest
     name: Run E2E Tests & Deploy Frontend
@@ -45,9 +45,9 @@ jobs:
           action: "upload"
           app_location: "smartqr-frontend"
           api_location: ""
-          output_location: "dist"
+          app_artifact_location: "dist"
 
-  close_pull_request:
+  close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
     runs-on: ubuntu-latest
     name: Close Pull Request Environment
