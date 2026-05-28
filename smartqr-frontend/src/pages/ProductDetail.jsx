@@ -143,9 +143,14 @@ export default function ProductDetail() {
               console.warn('Geo IP lookup failed', geoErr);
             }
 
-            const recordUrl = window.location.hostname === 'localhost'
-              ? 'http://localhost:7071/api/recordscan'
-              : 'https://smartqr-api-rahul-f8hpaqeudbdeesa5.centralindia-01.azurewebsites.net/api/recordscan';
+            const recordUrl = import.meta.env.VITE_API_BASE
+              ? `${import.meta.env.VITE_API_BASE}/recordscan`
+              : (
+                (window.location.hostname === 'localhost' && !navigator.webdriver)
+                  ? 'http://localhost:7071/api/recordscan'
+                  : 'https://smartqr-api-rahul-f8hpaqeudbdeesa5.centralindia-01.azurewebsites.net/api/recordscan'
+              );
+
 
             await fetch(recordUrl, {
               method: 'POST',
