@@ -293,18 +293,20 @@ export default function Scanner() {
 
       // Check if it's a SmartQR URL (e.g., https://lemon-bay-xxx.azurestaticapps.net/scan/BATCH123)
       let batchIdFromUrl = null;
+      let urlParams = '';
       try {
         const url = new URL(decodedText);
         const pathParts = url.pathname.split('/').filter(Boolean);
         if (pathParts.length >= 2 && (pathParts[0] === 'scan' || pathParts[0] === 'product')) {
           batchIdFromUrl = pathParts[1];
+          urlParams = url.search;
         }
       } catch {
         // Not a URL, continue with barcode lookup
       }
 
       if (batchIdFromUrl) {
-        navigate(`/scan/${batchIdFromUrl}`);
+        navigate(`/scan/${batchIdFromUrl}${urlParams}`);
         return;
       }
 

@@ -79,6 +79,47 @@ export default function ProductDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const getMRPLabel = () => {
+    if (!data) return t('productDetail.mrpPerStrip');
+    const type = data.type || 'Tablet';
+    switch (type) {
+      case 'Cream':
+        return t('productDetail.mrpPerTube');
+      case 'Syrup':
+      case 'Drops':
+        return t('productDetail.mrpPerBottle');
+      case 'Injection':
+        return t('productDetail.mrpPerVial');
+      case 'Capsule':
+      case 'Tablet':
+      default:
+        return t('productDetail.mrpPerStrip');
+    }
+  };
+
+  const getScannedItemLabel = () => {
+    if (!data) return '';
+    const type = data.type || 'Tablet';
+    switch (type) {
+      case 'Cream':
+        return `${t('scanner.tube')} ${stripScanned}`;
+      case 'Syrup':
+        return `${t('scanner.bottle')} ${stripScanned}`;
+      case 'Injection':
+        return `${t('scanner.vial')} ${stripScanned}`;
+      case 'Drops':
+        return `${t('scanner.bottle')} ${stripScanned}`;
+      case 'Capsule':
+        return `${t('scanner.capsule')} ${cellScanned} ${t('scanner.ofStrip')} ${stripScanned}`;
+      case 'Tablet':
+      default:
+        return `${t('scanner.tablet')} ${cellScanned} ${t('scanner.ofStrip')} ${stripScanned}`;
+    }
+  };
+
+  const isSingleUnit = data && ['Cream', 'Syrup', 'Injection', 'Drops'].includes(data.type);
+  const shouldShowScannedBadge = isSingleUnit ? !!stripScanned : (!!cellScanned && !!stripScanned);
+
   // Pre-load voices on mount
   useEffect(() => {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
@@ -103,8 +144,10 @@ export default function ProductDetail() {
         const manufacturer = result.manufacturer || {};
 
         const expDate = new Date(batch.exp_date);
+        expDate.setHours(0,0,0,0);
         const today = new Date();
-        const daysLeft = Math.floor((expDate - today) / (1000 * 60 * 60 * 24));
+        today.setHours(0,0,0,0);
+        const daysLeft = Math.round((expDate - today) / (1000 * 60 * 60 * 24));
         let status = 'SAFE';
         if (daysLeft < 0) status = 'EXPIRED';
         else if (daysLeft <= 90) status = 'EXPIRING_SOON';
@@ -284,9 +327,9 @@ export default function ProductDetail() {
               ))}
             </div>
 
-            {cellScanned && stripScanned && (
+            {shouldShowScannedBadge && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', background: '#f8fafc', color: '#334155', borderRadius: 12, fontSize: 13, fontWeight: 600, border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                {t('scanner.tablet')} {cellScanned} {t('scanner.ofStrip')} {stripScanned}
+                {getScannedItemLabel()}
               </div>
             )}
 
@@ -299,7 +342,7 @@ export default function ProductDetail() {
 
             {data.mrp && (
               <div style={infoBox}>
-                <p style={{ fontSize: 10, color: '#a0aec0', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>{t('productDetail.mrpPerStrip')}</p>
+                <p style={{ fontSize: 10, color: '#a0aec0', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>{getMRPLabel()}</p>
                 <p style={{ fontSize: 20, fontWeight: 700, color: '#1a1a2e' }}>₹{data.mrp}</p>
               </div>
             )}

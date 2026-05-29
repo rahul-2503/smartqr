@@ -30,6 +30,66 @@ export default function Batches() {
 
   const [form, setForm] = useState(emptyForm);
 
+  const getProductTypeInfo = (productId) => {
+    const p = products.find(prod => prod.product_id === productId);
+    if (!p) return { type: 'Tablet', isSingleUnit: false, packLabel: 'Strip', packLabelPlural: 'Strips', unitLabel: 'tablet', unitLabelPlural: 'tablets' };
+    
+    const type = p.type || 'Tablet';
+    switch (type) {
+      case 'Cream':
+        return { type, isSingleUnit: true, packLabel: 'Tube', packLabelPlural: 'Tubes', unitLabel: 'tube', unitLabelPlural: 'tubes' };
+      case 'Syrup':
+        return { type, isSingleUnit: true, packLabel: 'Bottle', packLabelPlural: 'Bottles', unitLabel: 'bottle', unitLabelPlural: 'bottles' };
+      case 'Injection':
+        return { type, isSingleUnit: true, packLabel: 'Vial', packLabelPlural: 'Vials', unitLabel: 'vial', unitLabelPlural: 'vials' };
+      case 'Drops':
+        return { type, isSingleUnit: true, packLabel: 'Bottle', packLabelPlural: 'Bottles', unitLabel: 'bottle', unitLabelPlural: 'bottles' };
+      case 'Capsule':
+        return { type, isSingleUnit: false, packLabel: 'Pack', packLabelPlural: 'Packs', unitLabel: 'capsule', unitLabelPlural: 'capsules' };
+      case 'Tablet':
+      default:
+        return { type, isSingleUnit: false, packLabel: 'Strip', packLabelPlural: 'Strips', unitLabel: 'tablet', unitLabelPlural: 'tablets' };
+    }
+  };
+
+  const typeInfo = getProductTypeInfo(form.productId);
+
+  const handleProductChange = (productId) => {
+    const selectedProduct = products.find(p => p.product_id === productId);
+    let tabletsPerStrip = 10;
+    if (selectedProduct) {
+      const type = selectedProduct.type;
+      const isSingleUnit = ['Cream', 'Syrup', 'Injection', 'Drops'].includes(type);
+      tabletsPerStrip = isSingleUnit ? 1 : 10;
+    }
+    setForm(prev => ({
+      ...prev,
+      productId,
+      tabletsPerStrip
+    }));
+  };
+
+  const formatPackagingConfig = (batch) => {
+    const p = products.find(prod => prod.product_id === batch.product_id);
+    if (!p) return `${batch.tablets_per_strip} units × ${batch.total_strips}`;
+    const type = p.type || 'Tablet';
+    switch (type) {
+      case 'Cream':
+        return `1 tube × ${batch.total_strips} tubes`;
+      case 'Syrup':
+        return `1 bottle × ${batch.total_strips} bottles`;
+      case 'Injection':
+        return `1 vial × ${batch.total_strips} vials`;
+      case 'Drops':
+        return `1 bottle × ${batch.total_strips} bottles`;
+      case 'Capsule':
+        return `${batch.tablets_per_strip} capsules × ${batch.total_strips} packs`;
+      case 'Tablet':
+      default:
+        return `${batch.tablets_per_strip} tablets × ${batch.total_strips} strips`;
+    }
+  };
+
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
@@ -308,7 +368,7 @@ export default function Batches() {
                   <label className="mfr-label">Select Associated Product *</label>
                   <select 
                     required className="mfr-select" value={form.productId} 
-                    onChange={e => setForm({...form, productId: e.target.value})}
+                    onChange={e => handleProductChange(e.target.value)}
                     disabled={!!editingBatch}
                   >
                     <option value="">— Choose Product —</option>
@@ -356,16 +416,24 @@ export default function Batches() {
 
                 <div className="mfr-form-row">
                   <div className="mfr-form-group">
-                    <label className="mfr-label">Items per Strip/Pack *</label>
-                    <select className="mfr-select" value={form.tabletsPerStrip} onChange={e => setForm({...form, tabletsPerStrip: parseInt(e.target.value)})}>
-                      <option value={4}>4 units</option>
-                      <option value={6}>6 units</option>
-                      <option value={10}>10 units</option>
-                      <option value={15}>15 units</option>
-                    </select>
+                    <label className="mfr-label">
+                      {typeInfo.isSingleUnit ? 'Units per Package' : 'Items per Strip/Pack *'}
+                    </label>
+                    {typeInfo.isSingleUnit ? (
+                      <select className="mfr-select" value={1} disabled>
+                        <option value={1}>1 unit (Single {typeInfo.packLabel})</option>
+                      </select>
+                    ) : (
+                      <select className="mfr-select" value={form.tabletsPerStrip} onChange={e => setForm({...form, tabletsPerStrip: parseInt(e.target.value)})}>
+                        <option value={4}>4 units</option>
+                        <option value={6}>6 units</option>
+                        <option value={10}>10 units</option>
+                        <option value={15}>15 units</option>
+                      </select>
+                    )}
                   </div>
                   <div className="mfr-form-group">
-                    <label className="mfr-label">Total Strips/Packs *</label>
+                    <label className="mfr-label">Total {typeInfo.packLabelPlural} *</label>
                     <input 
                       required type="number" min="1" className="mfr-input" placeholder="e.g. 100"
                       value={form.totalStrips} onChange={e => setForm({...form, totalStrips: parseInt(e.target.value) || 0})} 
@@ -387,7 +455,11 @@ export default function Batches() {
                     Generated Codes Count: {(form.tabletsPerStrip * (form.totalStrips || 0)).toLocaleString()}
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--mfr-text-secondary)', marginTop: '4px' }}>
-                    {form.totalStrips || 0} strips × {form.tabletsPerStrip} items/strip = {(form.tabletsPerStrip * (form.totalStrips || 0)).toLocaleString()} individual tracking barcodes.
+                    {typeInfo.isSingleUnit ? (
+                      `1 unit × ${form.totalStrips || 0} ${typeInfo.packLabelPlural.toLowerCase()} = ${(form.tabletsPerStrip * (form.totalStrips || 0)).toLocaleString()} individual tracking barcodes.`
+                    ) : (
+                      `${form.totalStrips || 0} ${typeInfo.packLabelPlural.toLowerCase()} × ${form.tabletsPerStrip} items/${typeInfo.packLabel.toLowerCase()} = ${(form.tabletsPerStrip * (form.totalStrips || 0)).toLocaleString()} individual tracking barcodes.`
+                    )}
                   </div>
                 </div>
 
@@ -474,7 +546,7 @@ export default function Batches() {
                     <th>Product</th>
                     <th>Mfg Date</th>
                     <th>Expiration</th>
-                    <th>Strip Config</th>
+                    <th>Packaging Config</th>
                     <th>QR Codes</th>
                     <th>MRP</th>
                     <th>Safety Status</th>
@@ -495,7 +567,7 @@ export default function Batches() {
                         <td style={{ fontWeight: 700 }}>{b.product_name || '—'}</td>
                         <td style={{ fontSize: '12.5px', color: 'var(--mfr-text-secondary)' }}>{b.mfg_date}</td>
                         <td style={{ fontSize: '12.5px', color: 'var(--mfr-text-secondary)' }}>{b.exp_date}</td>
-                        <td style={{ fontSize: '12px', color: 'var(--mfr-text-muted)' }}>{b.tablets_per_strip} units × {b.total_strips}</td>
+                        <td style={{ fontSize: '12px', color: 'var(--mfr-text-muted)', textTransform: 'lowercase' }}>{formatPackagingConfig(b)}</td>
                         <td style={{ fontWeight: 600, color: 'var(--mfr-text-primary)' }}>{(b.total_tablets || 0).toLocaleString()}</td>
                         <td style={{ fontSize: '12.5px', color: 'var(--mfr-text-secondary)', fontWeight: 600 }}>₹{b.mrp}</td>
                         <td>

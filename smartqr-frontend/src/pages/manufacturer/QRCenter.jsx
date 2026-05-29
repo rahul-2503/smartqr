@@ -65,11 +65,36 @@ export default function QRCenter() {
   const productBatches = batches.filter(b => b.product_id === selectedProduct);
   const selectedProductInfo = products.find(p => p.product_id === selectedProduct);
 
-  const getQRUrl = (batch) => {
+  const getTypeInfo = () => {
+    if (!selectedProductInfo) return { isSingleUnit: false, packLabel: 'Strip', packLabelPlural: 'Strips', unitLabel: 'tablet', unitLabelPlural: 'tablets' };
+    const type = selectedProductInfo.type || 'Tablet';
+    switch (type) {
+      case 'Cream':
+        return { isSingleUnit: true, packLabel: 'Tube', packLabelPlural: 'Tubes', unitLabel: 'tube', unitLabelPlural: 'tubes' };
+      case 'Syrup':
+        return { isSingleUnit: true, packLabel: 'Bottle', packLabelPlural: 'Bottles', unitLabel: 'bottle', unitLabelPlural: 'bottles' };
+      case 'Injection':
+        return { isSingleUnit: true, packLabel: 'Vial', packLabelPlural: 'Vials', unitLabel: 'vial', unitLabelPlural: 'vials' };
+      case 'Drops':
+        return { isSingleUnit: true, packLabel: 'Bottle', packLabelPlural: 'Bottles', unitLabel: 'bottle', unitLabelPlural: 'bottles' };
+      case 'Capsule':
+        return { isSingleUnit: false, packLabel: 'Pack', packLabelPlural: 'Packs', unitLabel: 'capsule', unitLabelPlural: 'capsules' };
+      case 'Tablet':
+      default:
+        return { isSingleUnit: false, packLabel: 'Strip', packLabelPlural: 'Strips', unitLabel: 'tablet', unitLabelPlural: 'tablets' };
+    }
+  };
+  const typeInfo = getTypeInfo();
+
+  const getQRUrl = (batch, cell = null, strip = null) => {
     // Use the composite document ID (orgDomain_batchId) for precise point-read lookup
     // This avoids cross-partition queries that could return wrong results
     const lookupId = batch.id || `${batch.organizationDomain}_${batch.batch_id}`;
-    return `${SMARTQR_BASE_URL}/scan/${encodeURIComponent(lookupId)}`;
+    let url = `${SMARTQR_BASE_URL}/scan/${encodeURIComponent(lookupId)}`;
+    if (cell && strip) {
+      url += `?cell=${cell}&strip=${strip}`;
+    }
+    return url;
   };
 
   const downloadStripPNG = async (stripNum) => {
@@ -82,10 +107,10 @@ export default function QRCenter() {
         useCORS: true
       });
       const link = document.createElement('a');
-      link.download = `SmartQR_${selectedBatch.batch_id}_Strip_${stripNum}.png`;
+      link.download = `SmartQR_${selectedBatch.batch_id}_${typeInfo.packLabel}_${stripNum}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
-      showMsg(`Strip ${stripNum} PNG generated successfully!`);
+      showMsg(`${typeInfo.packLabel} ${stripNum} PNG generated successfully!`);
     } catch (err) {
       showMsg('PNG render failed: ' + err.message, 'error');
     } finally {
@@ -108,15 +133,15 @@ export default function QRCenter() {
         await new Promise(r => setTimeout(r, 120));
         const canvas = await html2canvas(sheetRef.current, { scale: 2, backgroundColor: '#ffffff' });
         const imgData = canvas.toDataURL('image/png').split(',')[1];
-        zip.file(`Strip_${i}.png`, imgData, { base64: true });
+        zip.file(`${typeInfo.packLabel}_${i}.png`, imgData, { base64: true });
       }
 
       const content = await zip.generateAsync({ type: 'blob' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(content);
-      link.download = `SmartQR_${selectedBatch.batch_id}_AllStrips.zip`;
+      link.download = `SmartQR_${selectedBatch.batch_id}_All${typeInfo.packLabelPlural}.zip`;
       link.click();
-      showMsg(`ZIP archive containing ${totalStrips} strips downloaded successfully!`);
+      showMsg(`ZIP archive containing ${totalStrips} ${typeInfo.packLabelPlural.toLowerCase()} downloaded successfully!`);
       setCurrentStrip(1);
     } catch (err) {
       showMsg('ZIP creation failed: ' + err.message, 'error');
@@ -205,7 +230,7 @@ export default function QRCenter() {
                   {selectedProductInfo?.medicine_name} • Batch {selectedBatch.batch_id}
                 </h3>
                 <p style={{ fontSize: '12px', color: 'var(--mfr-text-secondary)', marginTop: '4px' }}>
-                  Mfg: {selectedBatch.mfg_date} • Expiry: {selectedBatch.exp_date} • {selectedBatch.tablets_per_strip} cells/strip • {selectedBatch.total_strips} total strips
+                  Mfg: {selectedBatch.mfg_date} • Expiry: {selectedBatch.exp_date} • {typeInfo.isSingleUnit ? `1 unit per pack • ${selectedBatch.total_strips} total packages/units` : `${selectedBatch.tablets_per_strip} cells/${typeInfo.unitLabel} • ${selectedBatch.total_strips} total ${typeInfo.packLabelPlural.toLowerCase()}`}
                 </p>
               </div>
               
@@ -244,13 +269,13 @@ export default function QRCenter() {
             <div className="mfr-card-body no-print" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {/* Strip selector navigator */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--mfr-text-secondary)' }}>Select Strip Sheet:</span>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--mfr-text-secondary)' }}>Select {typeInfo.packLabel} Sheet:</span>
                 <input 
                   type="number" min={1} max={selectedBatch.total_strips} value={currentStrip}
                   onChange={e => setCurrentStrip(Math.max(1, Math.min(selectedBatch.total_strips, parseInt(e.target.value) || 1)))}
                   className="mfr-input" style={{ width: '80px', height: '36px', padding: '6px 12px' }} 
                 />
-                <span style={{ fontSize: '12.5px', color: 'var(--mfr-text-muted)' }}>of {selectedBatch.total_strips} strips total</span>
+                <span style={{ fontSize: '12.5px', color: 'var(--mfr-text-muted)' }}>of {selectedBatch.total_strips} {typeInfo.packLabelPlural.toLowerCase()} total</span>
               </div>
 
               {/* Specifications guidelines */}
@@ -321,7 +346,7 @@ export default function QRCenter() {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '10px', color: '#71717a', fontWeight: 700, letterSpacing: '0.04em' }}>
-                      SHEET {currentStrip} OF {selectedBatch.total_strips}
+                      {typeInfo.packLabel.toUpperCase()} {currentStrip} OF {selectedBatch.total_strips}
                     </div>
                   </div>
                 </div>
@@ -343,7 +368,7 @@ export default function QRCenter() {
               >
                 {Array.from({ length: selectedBatch.tablets_per_strip }).map((_, i) => {
                   const cellNum = i + 1;
-                  const qrUrl = getQRUrl(selectedBatch);
+                  const qrUrl = getQRUrl(selectedBatch, cellNum, currentStrip);
                   return (
                     <div 
                       key={i} 
@@ -365,7 +390,7 @@ export default function QRCenter() {
                         fgColor="#09090b"
                       />
                       <span style={{ fontSize: '8px', color: '#71717a', marginTop: '4px', fontFamily: 'monospace', fontWeight: 500 }}>
-                        {selectedBatch.batch_id}·{cellNum}
+                        {typeInfo.isSingleUnit ? `${selectedBatch.batch_id}·${currentStrip}` : `${selectedBatch.batch_id}·${cellNum}`}
                       </span>
                     </div>
                   );
@@ -387,7 +412,7 @@ export default function QRCenter() {
                   SmartQR™ Platform • Verify safety by scanning code
                 </span>
                 <span style={{ fontSize: '8.5px', color: '#a1a1aa', fontFamily: 'monospace' }}>
-                  {selectedBatch.batch_id} • Strip {currentStrip} • {new Date().toISOString().split('T')[0]}
+                  {selectedBatch.batch_id} • {typeInfo.packLabel} {currentStrip} • {new Date().toISOString().split('T')[0]}
                 </span>
               </div>
             </div>
