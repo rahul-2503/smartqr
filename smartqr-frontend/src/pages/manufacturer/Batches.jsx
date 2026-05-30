@@ -256,48 +256,52 @@ export default function Batches() {
           <>
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              style={{ position: 'fixed', inset: 0, background: 'rgba(9,9,11,0.25)', backdropFilter: 'blur(8px)', zIndex: 300 }}
-              onClick={() => !deleting && setDeleteConfirm(null)}
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
               style={{
-                position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-                background: '#fff', borderRadius: 'var(--mfr-radius-lg)', padding: '32px',
-                width: '100%', maxWidth: '420px', zIndex: 301, boxShadow: 'var(--mfr-shadow-lg)',
-                border: '1px solid var(--mfr-border)'
+                position: 'fixed', inset: 0, background: 'rgba(9,9,11,0.25)', backdropFilter: 'blur(8px)', zIndex: 300,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px'
               }}
+              onClick={() => !deleting && setDeleteConfirm(null)}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                <div style={{
-                  width: 42, height: 42, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'rgba(239, 68, 68, 0.08)', color: '#ef4444', flexShrink: 0
-                }}>
-                  <HiOutlineExclamationTriangle style={{ width: 22, height: 22 }} />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+                style={{
+                  background: '#fff', borderRadius: 'var(--mfr-radius-lg)', padding: '32px',
+                  width: '100%', maxWidth: '420px', boxShadow: 'var(--mfr-shadow-lg)',
+                  border: '1px solid var(--mfr-border)'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                  <div style={{
+                    width: 42, height: 42, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(239, 68, 68, 0.08)', color: '#ef4444', flexShrink: 0
+                  }}>
+                    <HiOutlineExclamationTriangle style={{ width: 22, height: 22 }} />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--mfr-text-primary)' }}>Delete Batch</h3>
+                    <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--mfr-text-secondary)' }}>This action cannot be undone.</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--mfr-text-primary)' }}>Delete Batch</h3>
-                  <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--mfr-text-secondary)' }}>This action cannot be undone.</p>
+                <p style={{ fontSize: '13.5px', color: 'var(--mfr-text-secondary)', lineHeight: 1.6, margin: '0 0 24px' }}>
+                  Are you sure you want to delete batch <strong style={{ color: 'var(--mfr-text-primary)', fontFamily: 'monospace' }}>{deleteConfirm.batch_id}</strong> 
+                  {deleteConfirm.product_name ? ` (${deleteConfirm.product_name})` : ''}? 
+                  All {(deleteConfirm.total_tablets || 0).toLocaleString()} associated QR codes will be invalidated.
+                </p>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button 
+                    onClick={() => setDeleteConfirm(null)} disabled={deleting}
+                    className="mfr-btn mfr-btn-outline" style={{ flex: 1, padding: '10px', background: '#fff' }}
+                  >Cancel</button>
+                  <button 
+                    onClick={handleDelete} disabled={deleting}
+                    className="mfr-btn" id="confirm-delete-batch"
+                    style={{ flex: 1, padding: '10px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 'var(--mfr-radius-md)', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                  >
+                    {deleting ? <><div className="mfr-spinner" style={{ borderTopColor: '#fff' }} /> Deleting...</> : <><HiOutlineTrash style={{ width: 15, height: 15 }} /> Delete</>}
+                  </button>
                 </div>
-              </div>
-              <p style={{ fontSize: '13.5px', color: 'var(--mfr-text-secondary)', lineHeight: 1.6, margin: '0 0 24px' }}>
-                Are you sure you want to delete batch <strong style={{ color: 'var(--mfr-text-primary)', fontFamily: 'monospace' }}>{deleteConfirm.batch_id}</strong> 
-                {deleteConfirm.product_name ? ` (${deleteConfirm.product_name})` : ''}? 
-                All {(deleteConfirm.total_tablets || 0).toLocaleString()} associated QR codes will be invalidated.
-              </p>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button 
-                  onClick={() => setDeleteConfirm(null)} disabled={deleting}
-                  className="mfr-btn mfr-btn-outline" style={{ flex: 1, padding: '10px', background: '#fff' }}
-                >Cancel</button>
-                <button 
-                  onClick={handleDelete} disabled={deleting}
-                  className="mfr-btn" id="confirm-delete-batch"
-                  style={{ flex: 1, padding: '10px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 'var(--mfr-radius-md)', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                >
-                  {deleting ? <><div className="mfr-spinner" style={{ borderTopColor: '#fff' }} /> Deleting...</> : <><HiOutlineTrash style={{ width: 15, height: 15 }} /> Delete</>}
-                </button>
-              </div>
+              </motion.div>
             </motion.div>
           </>
         )}

@@ -579,7 +579,7 @@ export default function Scanner() {
                   </p>
 
                   {/* Single unified action buttons */}
-                  <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+                  <div className="scanner-btn-row">
                     <button 
                       onClick={startBarcodeScanner} 
                       disabled={isUploadProcessing}

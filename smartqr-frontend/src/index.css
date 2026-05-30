@@ -389,3 +389,18 @@ body {
     padding: 6px 12px !important;
   }
 }
+
+/* ═══ Scanner Responsive Layout ═══ */
+.scanner-btn-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 480px) {
+  .scanner-btn-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
