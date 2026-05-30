@@ -90,10 +90,41 @@ export default function Scanner() {
       if (devices && devices.length > 0) {
         let selectedCameraId = devices[0].id;
         if (devices.length > 1) {
+          // 1. Try to find a back/rear camera for mobile users
           const backCamera = devices.find(d => 
-            d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('rear') || d.label.toLowerCase().includes('environment')
+            d.label.toLowerCase().includes('back') || 
+            d.label.toLowerCase().includes('rear') || 
+            d.label.toLowerCase().includes('environment')
           );
-          selectedCameraId = backCamera ? backCamera.id : devices[devices.length - 1].id;
+          
+          if (backCamera) {
+            selectedCameraId = backCamera.id;
+          } else {
+            // 2. Sort to prioritize physical webcams over virtual/phone webcams on desktop
+            const sorted = [...devices].sort((a, b) => {
+              const aName = a.label.toLowerCase();
+              const bName = b.label.toLowerCase();
+              
+              // Identify virtual/phone webcams that might be locked or inactive
+              const virtualKeywords = ['virtual', 'obs', 'phone', 'oneplus', 'samsung', 'pixel', 'link to windows', 'droidcam', 'iriun', 'epoccam'];
+              const isAVirtual = virtualKeywords.some(kw => aName.includes(kw));
+              const isBVirtual = virtualKeywords.some(kw => bName.includes(kw));
+              
+              if (isAVirtual && !isBVirtual) return 1;
+              if (!isAVirtual && isBVirtual) return -1;
+              
+              // Identify real physical integrated/usb cameras
+              const physicalKeywords = ['integrated', 'usb', 'facetime', 'webcam', 'hd camera', 'pc camera'];
+              const isAPhysical = physicalKeywords.some(kw => aName.includes(kw));
+              const isBPhysical = physicalKeywords.some(kw => bName.includes(kw));
+              
+              if (isAPhysical && !isBPhysical) return -1;
+              if (!isAPhysical && isBPhysical) return 1;
+              
+              return 0;
+            });
+            selectedCameraId = sorted[0].id;
+          }
         }
         await html5Qr.start(selectedCameraId, qrConfig, onSuccess, () => { });
       } else {
