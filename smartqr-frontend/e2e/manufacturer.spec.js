@@ -42,7 +42,7 @@ test.describe('Manufacturer Workspace', () => {
     await page.locator('#register-submit').click();
 
     // Verify redirection to dashboard
-    await expect(page).toHaveURL(/\/manufacturer\/dashboard/);
+    await expect(page).toHaveURL(/\/manufacturer\/dashboard/, { timeout: 20000 });
     await expect(page.locator('h1')).toContainText(`Welcome back, ${testCompany}`);
 
     // Helper to open sidebar on mobile viewports

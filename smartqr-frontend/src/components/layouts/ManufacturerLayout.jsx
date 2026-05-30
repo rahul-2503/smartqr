@@ -4,9 +4,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   HiOutlineSquares2X2, HiOutlineCube, HiOutlineArchiveBox,
   HiOutlineQrCode, HiOutlineArrowRightOnRectangle,
-  HiOutlineShieldCheck, HiOutlineBars3, HiOutlineXMark
+  HiOutlineShieldCheck, HiOutlineBars3, HiOutlineXMark,
+  HiOutlineSparkles
 } from 'react-icons/hi2';
 import { useAuth } from '../../context/AuthContext';
+import AiCopilot from '../AiCopilot';
 import '../../manufacturer.css';
 
 const NAV_ITEMS = [
@@ -120,7 +122,23 @@ export default function ManufacturerLayout() {
               </Link>
             );
           })}
-        </nav>
+          </nav>
+
+          {/* AI Badge */}
+          <div style={{ padding: '0 16px', marginBottom: '12px' }}>
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(124,58,237,0.08), rgba(59,130,246,0.05))',
+              border: '1px solid rgba(124,58,237,0.12)',
+              borderRadius: '8px',
+              padding: '10px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <HiOutlineSparkles style={{ width: 14, height: 14, color: '#7c3aed' }} />
+              <span style={{ fontSize: '11px', fontWeight: 600, color: '#7c3aed' }}>Powered by Azure OpenAI</span>
+            </div>
+          </div>
 
         <div className="mfr-sidebar-footer">
           <div className="mfr-sidebar-org">
@@ -199,6 +217,9 @@ export default function ManufacturerLayout() {
       >
         {sidebarOpen ? <HiOutlineXMark style={{ width: 20, height: 20 }} /> : <HiOutlineBars3 style={{ width: 20, height: 20 }} />}
       </button>
+
+      {/* AI Copilot Widget */}
+      <AiCopilot />
     </div>
   );
 }

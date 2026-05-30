@@ -4,9 +4,10 @@ import {
   HiOutlineCube, HiOutlinePlus, HiOutlineXMark,
   HiOutlineCheckCircle, HiOutlineExclamationCircle,
   HiOutlineMagnifyingGlass, HiOutlinePencilSquare,
-  HiOutlineTrash, HiOutlineExclamationTriangle
+  HiOutlineTrash, HiOutlineExclamationTriangle,
+  HiOutlineSparkles
 } from 'react-icons/hi2';
-import { getOrgProducts, registerProduct, updateProduct, deleteProduct } from '../../api/manufacturerApi';
+import { getOrgProducts, registerProduct, updateProduct, deleteProduct, aiAutofillProduct } from '../../api/manufacturerApi';
 import '../../manufacturer.css';
 
 export default function Products() {
@@ -19,6 +20,8 @@ export default function Products() {
   const [search, setSearch] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiFilled, setAiFilled] = useState(false);
 
   const emptyForm = {
     medicineName: '', genericName: '', dosage: '', type: 'Tablet',
@@ -51,6 +54,42 @@ export default function Products() {
     setEditingProduct(null);
     setForm(emptyForm);
     setShowForm(true);
+    setAiFilled(false);
+  };
+
+  const handleAiAutofill = async () => {
+    if (!form.medicineName || form.medicineName.trim().length < 2) {
+      showMsg('Enter a medicine name first (at least 2 characters)', 'error');
+      return;
+    }
+    setAiLoading(true);
+    setAiFilled(false);
+    try {
+      const data = await aiAutofillProduct(form.medicineName.trim());
+      if (data.autofill) {
+        const a = data.autofill;
+        setForm(prev => ({
+          ...prev,
+          genericName: a.genericName || prev.genericName,
+          dosage: a.dosage || prev.dosage,
+          type: a.type || prev.type,
+          category: a.category || prev.category,
+          composition: a.composition || prev.composition,
+          storage: a.storage || prev.storage,
+          dosageInstructions: a.dosageInstructions || prev.dosageInstructions,
+          sideEffects: a.sideEffects || prev.sideEffects,
+          contraindications: a.contraindications || prev.contraindications,
+          prescriptionRequired: a.prescriptionRequired ?? prev.prescriptionRequired
+        }));
+        setAiFilled(true);
+        showMsg(`AI auto-filled product details for "${form.medicineName}"`);
+        setTimeout(() => setAiFilled(false), 6000);
+      }
+    } catch (err) {
+      showMsg('AI autofill failed: ' + err.message, 'error');
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   const openEditForm = (product) => {
@@ -287,6 +326,53 @@ export default function Products() {
                   gap: '20px' 
                 }}
               >
+                {/* AI Autofill Banner */}
+                {!editingProduct && (
+                  <div style={{
+                    background: aiFilled ? 'linear-gradient(135deg, rgba(16,185,129,0.06), rgba(16,185,129,0.02))' : 'linear-gradient(135deg, rgba(139,92,246,0.06), rgba(59,130,246,0.03))',
+                    border: aiFilled ? '1px solid rgba(16,185,129,0.2)' : '1px solid rgba(139,92,246,0.15)',
+                    borderRadius: 'var(--mfr-radius-md)',
+                    padding: '12px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', fontWeight: 600, color: aiFilled ? '#10b981' : '#7c3aed' }}>
+                      <HiOutlineSparkles style={{ width: 16, height: 16 }} />
+                      {aiFilled ? 'AI auto-filled all fields — please review' : 'Type medicine name below, then click AI Autofill to populate all fields'}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAiAutofill}
+                      disabled={aiLoading || !form.medicineName || form.medicineName.trim().length < 2}
+                      id="ai-autofill-btn"
+                      style={{
+                        background: aiLoading ? '#e4e4e7' : 'linear-gradient(135deg, #7c3aed, #3b82f6)',
+                        color: aiLoading ? '#71717a' : '#ffffff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '7px 14px',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        cursor: aiLoading ? 'wait' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      {aiLoading ? (
+                        <><div className="mfr-spinner" style={{ width: 14, height: 14, borderWidth: 2, borderTopColor: '#71717a' }} /> Analyzing...</>
+                      ) : (
+                        <><HiOutlineSparkles style={{ width: 14, height: 14 }} /> AI Autofill</>
+                      )}
+                    </button>
+                  </div>
+                )}
+
                 <div className="mfr-form-row">
                   <div className="mfr-form-group">
                     <label className="mfr-label">Medicine Name *</label>

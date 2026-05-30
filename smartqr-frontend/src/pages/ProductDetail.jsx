@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { getBatchById } from '../api/manufacturerApi';
+import { motion, AnimatePresence } from 'framer-motion';
+import { getBatchById, aiDrugInteraction } from '../api/manufacturerApi';
 import { useLanguage } from '../i18n/LanguageContext';
 import {
   HiOutlineSpeakerWave, HiOutlineShieldCheck, HiOutlineClock,
   HiOutlineExclamationTriangle, HiOutlineArrowLeft, HiOutlineQrCode,
+  HiOutlineSparkles
 } from 'react-icons/hi2';
 
 const formatDateForSpeech = (dateStr, lang) => {
@@ -78,6 +79,10 @@ export default function ProductDetail() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [interactionInput, setInteractionInput] = useState('');
+  const [interactionResult, setInteractionResult] = useState(null);
+  const [interactionLoading, setInteractionLoading] = useState(false);
+  const [interactionError, setInteractionError] = useState(null);
 
   const getMRPLabel = () => {
     if (!data) return t('productDetail.mrpPerStrip');
@@ -252,6 +257,24 @@ export default function ProductDetail() {
     window.speechSynthesis.speak(u);
   };
 
+  const checkDrugInteraction = async () => {
+    if (!interactionInput.trim() || !data) return;
+    setInteractionLoading(true);
+    setInteractionError(null);
+    setInteractionResult(null);
+    try {
+      const medicines = [data.product_name, interactionInput.trim()];
+      const response = await aiDrugInteraction(medicines);
+      if (response.result) {
+        setInteractionResult(response.result);
+      }
+    } catch (err) {
+      setInteractionError(err.message);
+    } finally {
+      setInteractionLoading(false);
+    }
+  };
+
   const infoBox = { background: '#f8f9fa', borderRadius: 16, padding: 16, textAlign: 'center' };
 
   if (loading) {
@@ -386,6 +409,96 @@ export default function ProductDetail() {
               style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '16px 0', background: '#2d6a4f', color: 'white', fontSize: 18, fontWeight: 600, borderRadius: 16, border: 'none', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 4px 16px rgba(45,106,79,0.25)' }}>
               <HiOutlineSpeakerWave style={{ width: 24, height: 24 }} /> {t('productDetail.readAloud')}
             </button>
+
+            {/* Drug Interaction Checker */}
+            <div style={{ padding: 24, background: 'linear-gradient(135deg, rgba(124,58,237,0.04), rgba(59,130,246,0.02))', borderRadius: 16, border: '1px solid rgba(124,58,237,0.12)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <HiOutlineSparkles style={{ width: 18, height: 18, color: '#7c3aed' }} />
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1a1a2e' }}>Drug Interaction Checker</h3>
+              </div>
+              <p style={{ fontSize: 12.5, color: '#718096', lineHeight: 1.5, margin: '0 0 14px' }}>
+                Taking another medicine along with <strong>{data.product_name}</strong>? Check for potential interactions.
+              </p>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <input
+                  value={interactionInput}
+                  onChange={e => setInteractionInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && checkDrugInteraction()}
+                  placeholder="e.g., Warfarin, Aspirin, Metformin..."
+                  disabled={interactionLoading}
+                  id="drug-interaction-input"
+                  style={{
+                    flex: 1, padding: '10px 14px', borderRadius: 10, border: '1px solid #e2e8f0',
+                    fontSize: 13.5, fontFamily: 'inherit', outline: 'none', background: '#fff',
+                    transition: 'border-color 0.15s'
+                  }}
+                />
+                <button
+                  onClick={checkDrugInteraction}
+                  disabled={interactionLoading || !interactionInput.trim()}
+                  id="check-interaction-btn"
+                  style={{
+                    background: interactionLoading ? '#e4e4e7' : 'linear-gradient(135deg, #7c3aed, #3b82f6)',
+                    color: interactionLoading ? '#71717a' : '#fff',
+                    border: 'none', borderRadius: 10, padding: '10px 18px',
+                    fontSize: 13, fontWeight: 700, cursor: interactionLoading ? 'wait' : 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap'
+                  }}
+                >
+                  {interactionLoading ? (
+                    <><div style={{ width: 14, height: 14, border: '2px solid #a1a1aa', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> Checking...</>
+                  ) : (
+                    <><HiOutlineSparkles style={{ width: 14, height: 14 }} /> Check</>
+                  )}
+                </button>
+              </div>
+
+              {interactionError && (
+                <div style={{ padding: 12, background: '#fef2f2', borderRadius: 10, border: '1px solid #fecaca', fontSize: 13, color: '#dc2626', marginBottom: 12 }}>
+                  {interactionError}
+                </div>
+              )}
+
+              <AnimatePresence>
+                {interactionResult && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    style={{ display: 'flex', flexDirection: 'column', gap: 10 }}
+                  >
+                    {/* Interaction Results */}
+                    {interactionResult.interactions?.map((inter, i) => {
+                      const sevColor = inter.severity === 'SEVERE' ? '#dc2626' : inter.severity === 'MODERATE' ? '#d97706' : '#10b981';
+                      const sevBg = inter.severity === 'SEVERE' ? 'rgba(220,38,38,0.04)' : inter.severity === 'MODERATE' ? 'rgba(245,158,11,0.04)' : 'rgba(16,185,129,0.04)';
+                      const sevBorder = inter.severity === 'SEVERE' ? 'rgba(220,38,38,0.15)' : inter.severity === 'MODERATE' ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)';
+                      return (
+                        <div key={i} style={{ padding: 14, background: sevBg, borderRadius: 12, border: `1px solid ${sevBorder}` }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                            <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 4, background: sevColor + '18', color: sevColor }}>{inter.severity}</span>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>{inter.type}</span>
+                          </div>
+                          <p style={{ fontSize: 13, color: '#374151', lineHeight: 1.6, margin: '0 0 6px' }}><strong>Effects:</strong> {inter.effects}</p>
+                          <p style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5, margin: '0 0 6px' }}><strong>Mechanism:</strong> {inter.mechanism}</p>
+                          <p style={{ fontSize: 12.5, color: '#7c3aed', fontWeight: 600, margin: 0 }}>→ {inter.recommendation}</p>
+                        </div>
+                      );
+                    })}
+
+                    {interactionResult.generalAdvice && (
+                      <div style={{ padding: 12, background: '#f0f9ff', borderRadius: 10, border: '1px solid #e0f2fe', fontSize: 12.5, color: '#0369a1', lineHeight: 1.5 }}>
+                        {interactionResult.generalAdvice}
+                      </div>
+                    )}
+
+                    {interactionResult.disclaimer && (
+                      <p style={{ fontSize: 10.5, color: '#a0aec0', lineHeight: 1.5, margin: 0, fontStyle: 'italic' }}>
+                        {interactionResult.disclaimer}
+                      </p>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </motion.div>
       </div>

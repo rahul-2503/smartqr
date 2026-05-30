@@ -6,9 +6,9 @@ import {
   HiOutlineCheckCircle, HiOutlineExclamationCircle,
   HiOutlineQrCode, HiOutlineMagnifyingGlass,
   HiOutlinePencilSquare, HiOutlineTrash,
-  HiOutlineExclamationTriangle
+  HiOutlineExclamationTriangle, HiOutlineSparkles
 } from 'react-icons/hi2';
-import { getOrgProducts, registerBatch, updateBatch, deleteBatch } from '../../api/manufacturerApi';
+import { getOrgProducts, registerBatch, updateBatch, deleteBatch, aiBatchAssist } from '../../api/manufacturerApi';
 import '../../manufacturer.css';
 
 export default function Batches() {
@@ -22,6 +22,8 @@ export default function Batches() {
   const [search, setSearch] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   const emptyForm = {
     productId: '', batchNo: '', mfgDate: '', expDate: '',
@@ -113,6 +115,29 @@ export default function Batches() {
     setEditingBatch(null);
     setForm(emptyForm);
     setShowForm(true);
+    setAiAnalysis(null);
+  };
+
+  const handleAiAssist = async () => {
+    if (!form.productId || !form.mfgDate || !form.expDate) return;
+    setAiLoading(true);
+    try {
+      const data = await aiBatchAssist({
+        productId: form.productId,
+        mfgDate: form.mfgDate,
+        expDate: form.expDate,
+        mrp: form.mrp,
+        tabletsPerStrip: form.tabletsPerStrip,
+        totalStrips: form.totalStrips
+      });
+      if (data.analysis) {
+        setAiAnalysis(data.analysis);
+      }
+    } catch (err) {
+      console.error('AI Batch assist error:', err);
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   const openEditForm = (batch) => {
@@ -462,6 +487,84 @@ export default function Batches() {
                     )}
                   </div>
                 </div>
+
+                {/* AI Batch Assistant Section */}
+                {!editingBatch && (
+                  <div style={{
+                    background: aiAnalysis ? 'linear-gradient(135deg, rgba(16,185,129,0.04), rgba(59,130,246,0.02))' : 'linear-gradient(135deg, rgba(139,92,246,0.04), rgba(59,130,246,0.02))',
+                    border: '1px solid ' + (aiAnalysis ? 'rgba(16,185,129,0.15)' : 'rgba(139,92,246,0.12)'),
+                    borderRadius: 'var(--mfr-radius-md)',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', fontWeight: 700, color: aiAnalysis ? '#10b981' : '#7c3aed' }}>
+                        <HiOutlineSparkles style={{ width: 15, height: 15 }} />
+                        AI Batch Assistant
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAiAssist}
+                        disabled={aiLoading || !form.productId || !form.mfgDate || !form.expDate}
+                        id="ai-batch-assist-btn"
+                        style={{
+                          background: aiLoading ? '#e4e4e7' : 'linear-gradient(135deg, #7c3aed, #3b82f6)',
+                          color: aiLoading ? '#71717a' : '#fff',
+                          border: 'none', borderRadius: '6px', padding: '5px 12px',
+                          fontSize: '11px', fontWeight: 700, cursor: aiLoading ? 'wait' : 'pointer',
+                          display: 'flex', alignItems: 'center', gap: '5px'
+                        }}
+                      >
+                        {aiLoading ? <><div className="mfr-spinner" style={{ width: 12, height: 12, borderWidth: 2, borderTopColor: '#71717a' }} /> Analyzing...</> : 'Analyze Batch'}
+                      </button>
+                    </div>
+                    {aiAnalysis && (
+                      <div style={{ padding: '0 16px 14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {/* Risk Level Badge */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{
+                            fontSize: '10.5px', fontWeight: 700, padding: '3px 8px', borderRadius: '4px',
+                            background: aiAnalysis.riskLevel === 'HIGH' ? 'rgba(220,38,38,0.08)' : aiAnalysis.riskLevel === 'MEDIUM' ? 'rgba(245,158,11,0.08)' : 'rgba(16,185,129,0.08)',
+                            color: aiAnalysis.riskLevel === 'HIGH' ? '#dc2626' : aiAnalysis.riskLevel === 'MEDIUM' ? '#d97706' : '#10b981',
+                            border: '1px solid ' + (aiAnalysis.riskLevel === 'HIGH' ? 'rgba(220,38,38,0.2)' : aiAnalysis.riskLevel === 'MEDIUM' ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)')
+                          }}>{aiAnalysis.riskLevel} RISK</span>
+                          <span style={{ fontSize: '11px', color: 'var(--mfr-text-muted)' }}>{aiAnalysis.shelfLifeAssessment}</span>
+                        </div>
+                        {/* Compliance Flags */}
+                        {aiAnalysis.complianceFlags?.length > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            {aiAnalysis.complianceFlags.map((flag, i) => (
+                              <div key={i} style={{ fontSize: '11.5px', color: '#d97706', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                                <HiOutlineExclamationTriangle style={{ width: 13, height: 13, flexShrink: 0, marginTop: 1 }} />
+                                <span>{flag}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {/* AI Warnings with Apply Button */}
+                        {aiAnalysis.warnings && (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'rgba(255,255,255,0.6)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(0,0,0,0.04)' }}>
+                            <span style={{ fontSize: '11.5px', color: 'var(--mfr-text-secondary)', flex: 1 }}>{aiAnalysis.warnings.substring(0, 120)}...</span>
+                            <button
+                              type="button"
+                              onClick={() => setForm(prev => ({ ...prev, warnings: aiAnalysis.warnings }))}
+                              style={{ fontSize: '10.5px', fontWeight: 700, color: '#7c3aed', background: 'none', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                            >Apply</button>
+                          </div>
+                        )}
+                        {/* Suggestions */}
+                        {aiAnalysis.suggestions?.length > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                            {aiAnalysis.suggestions.slice(0, 3).map((s, i) => (
+                              <div key={i} style={{ fontSize: '11px', color: 'var(--mfr-text-muted)', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                                <span style={{ color: '#3b82f6', fontWeight: 700 }}>•</span> {s}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="mfr-form-group">
                   <label className="mfr-label">Batch Specific Warnings (Optional)</label>

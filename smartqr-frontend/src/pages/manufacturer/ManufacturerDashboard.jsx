@@ -13,7 +13,9 @@ import {
   getOrgProducts,
   getAuditLogs,
   getScanAnalytics,
-  negotiateSignalR
+  negotiateSignalR,
+  aiDashboardInsights,
+  aiRiskAssessment
 } from '../../api/manufacturerApi';
 import { HubConnectionBuilder } from '@microsoft/signalr';
 import Chart from 'chart.js/auto';
@@ -29,6 +31,11 @@ export default function ManufacturerDashboard() {
   const [expiryTab, setExpiryTab] = useState('30'); // '30' | '60' | '90'
   const [connectionType, setConnectionType] = useState('none'); // 'signalr' | 'polling' | 'none'
   const [toast, setToast] = useState(null);
+  const [aiInsights, setAiInsights] = useState(null);
+  const [aiInsightsLoading, setAiInsightsLoading] = useState(false);
+  const [riskData, setRiskData] = useState(null);
+  const [riskLoading, setRiskLoading] = useState(false);
+  const [showRiskModal, setShowRiskModal] = useState(false);
 
   // Canvas Refs
   const lineCanvasRef = useRef(null);
@@ -67,6 +74,31 @@ export default function ManufacturerDashboard() {
     }
   };
 
+  const loadAiInsights = async () => {
+    setAiInsightsLoading(true);
+    try {
+      const data = await aiDashboardInsights();
+      if (data.insights) setAiInsights(data.insights);
+    } catch (err) {
+      console.error('AI insights failed:', err);
+    } finally {
+      setAiInsightsLoading(false);
+    }
+  };
+
+  const loadRiskAssessment = async () => {
+    setRiskLoading(true);
+    setShowRiskModal(true);
+    try {
+      const data = await aiRiskAssessment();
+      if (data.assessment) setRiskData(data);
+    } catch (err) {
+      console.error('AI risk assessment failed:', err);
+    } finally {
+      setRiskLoading(false);
+    }
+  };
+
   // SignalR & Polling integration
   useEffect(() => {
     if (loading) return;
@@ -93,6 +125,9 @@ export default function ManufacturerDashboard() {
             .build();
 
           connection.on('newScan', (newScanEvent) => {
+            if (newScanEvent.organizationDomain !== organization?.domain) {
+              return;
+            }
             console.log('Real-time scan received:', newScanEvent);
             showNotification(newScanEvent);
 
@@ -543,6 +578,9 @@ export default function ManufacturerDashboard() {
           </div>
         </div>
         <div className="mfr-page-header-actions" style={{ gap: '12px' }}>
+          <button onClick={loadRiskAssessment} className="mfr-btn mfr-btn-outline" style={{ background: '#ffffff', gap: '6px' }} id="risk-assessment-btn">
+            <HiOutlineExclamationTriangle style={{ width: 15, height: 15, color: '#dc2626' }} /> AI Risk Report
+          </button>
           <Link to="/manufacturer/products" className="mfr-btn mfr-btn-outline" style={{ background: '#ffffff' }}>
             <HiOutlineCube style={{ width: 15, height: 15 }} /> Add Product
           </Link>
@@ -717,6 +755,44 @@ export default function ManufacturerDashboard() {
 
         {/* Right Column: Expiry Alerts & Real-Time Scan Activity Feed */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {/* AI Insights Card */}
+          <div className="mfr-card" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.03), rgba(59,130,246,0.02))', border: '1px solid rgba(139,92,246,0.12)' }}>
+            <div className="mfr-card-header" style={{ padding: '16px 20px', borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0, fontSize: '14px' }}>
+                  <HiOutlineSparkles style={{ width: 16, height: 16, color: '#7c3aed' }} />
+                  AI Intelligence Briefing
+                </h3>
+                <button
+                  onClick={loadAiInsights}
+                  disabled={aiInsightsLoading}
+                  style={{
+                    background: aiInsightsLoading ? '#e4e4e7' : 'linear-gradient(135deg, #7c3aed, #3b82f6)',
+                    color: aiInsightsLoading ? '#71717a' : '#fff',
+                    border: 'none', borderRadius: '6px', padding: '5px 12px',
+                    fontSize: '11px', fontWeight: 700, cursor: aiInsightsLoading ? 'wait' : 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '5px'
+                  }}
+                  id="ai-insights-btn"
+                >
+                  {aiInsightsLoading ? <><div className="mfr-spinner" style={{ width: 12, height: 12, borderWidth: 2, borderTopColor: '#71717a' }} /> Analyzing...</> : <><HiOutlineSparkles style={{ width: 12, height: 12 }} /> Generate</>}
+                </button>
+              </div>
+            </div>
+            <div className="mfr-card-body" style={{ padding: '16px 20px' }}>
+              {aiInsights ? (
+                <div style={{ fontSize: '13px', color: 'var(--mfr-text-secondary)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                  {aiInsights}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--mfr-text-muted)' }}>
+                  <HiOutlineSparkles style={{ width: 24, height: 24, margin: '0 auto 8px', opacity: 0.4 }} />
+                  <p style={{ fontSize: '12px', margin: 0 }}>Click "Generate" for an AI-powered analysis of your organization\'s operations</p>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Expiry Alerts Card */}
           <div className="mfr-card">
             <div className="mfr-card-header" style={{ padding: '16px 20px', borderBottom: '1px solid var(--mfr-border)' }}>
@@ -1016,6 +1092,124 @@ export default function ManufacturerDashboard() {
           }
         }
       `}</style>
+
+      {/* Risk Assessment Modal */}
+      <AnimatePresence>
+        {showRiskModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(9,9,11,0.4)', backdropFilter: 'blur(12px)', zIndex: 400 }}
+              onClick={() => !riskLoading && setShowRiskModal(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }}
+              style={{
+                position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                background: '#fff', borderRadius: '16px', width: '95%', maxWidth: '720px', maxHeight: '85vh',
+                overflowY: 'auto', zIndex: 401, boxShadow: '0 25px 50px rgba(0,0,0,0.15)', border: '1px solid var(--mfr-border)'
+              }}
+            >
+              <div style={{ padding: '24px 28px', borderBottom: '1px solid var(--mfr-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#fff', zIndex: 1, borderRadius: '16px 16px 0 0' }}>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <HiOutlineSparkles style={{ width: 20, height: 20, color: '#7c3aed' }} /> AI Risk Assessment
+                  </h2>
+                  <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--mfr-text-muted)' }}>Powered by Azure OpenAI • Real-time org data analysis</p>
+                </div>
+                <button onClick={() => setShowRiskModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--mfr-text-muted)' }}>
+                  <HiOutlineExclamationTriangle style={{ width: 0, height: 0 }} />
+                  ✕
+                </button>
+              </div>
+              <div style={{ padding: '24px 28px' }}>
+                {riskLoading ? (
+                  <div style={{ textAlign: 'center', padding: '60px 0' }}>
+                    <div className="mfr-spinner" style={{ width: 32, height: 32, borderWidth: 3, margin: '0 auto 16px' }} />
+                    <p style={{ fontSize: '13px', color: 'var(--mfr-text-muted)', fontWeight: 600 }}>Analyzing {organization?.name || 'organization'} data...</p>
+                    <p style={{ fontSize: '11px', color: 'var(--mfr-text-muted)' }}>Products, batches, scans, and audit logs</p>
+                  </div>
+                ) : riskData?.assessment ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    {/* Risk Score Header */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '20px', borderRadius: '12px', background: riskData.assessment.overallRiskLevel === 'CRITICAL' ? 'rgba(220,38,38,0.04)' : riskData.assessment.overallRiskLevel === 'HIGH' ? 'rgba(245,158,11,0.04)' : 'rgba(16,185,129,0.04)', border: '1px solid ' + (riskData.assessment.overallRiskLevel === 'CRITICAL' ? 'rgba(220,38,38,0.15)' : riskData.assessment.overallRiskLevel === 'HIGH' ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)') }}>
+                      <div style={{ width: 56, height: 56, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: riskData.assessment.overallRiskLevel === 'CRITICAL' || riskData.assessment.overallRiskLevel === 'HIGH' ? 'rgba(220,38,38,0.1)' : 'rgba(16,185,129,0.1)', fontSize: '20px', fontWeight: 900, color: riskData.assessment.overallRiskLevel === 'CRITICAL' || riskData.assessment.overallRiskLevel === 'HIGH' ? '#dc2626' : '#10b981' }}>
+                        {riskData.assessment.riskScore}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '16px', fontWeight: 800 }}>{riskData.assessment.overallRiskLevel} Risk</div>
+                        <div style={{ fontSize: '12px', color: 'var(--mfr-text-secondary)', marginTop: 2 }}>{riskData.assessment.executiveSummary}</div>
+                      </div>
+                    </div>
+                    {/* Critical Alerts */}
+                    {riskData.assessment.criticalAlerts?.length > 0 && (
+                      <div>
+                        <h4 style={{ fontSize: '13px', fontWeight: 700, margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.03em', color: 'var(--mfr-text-muted)' }}>Alerts ({riskData.assessment.criticalAlerts.length})</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {riskData.assessment.criticalAlerts.map((alert, i) => (
+                            <div key={i} style={{ padding: '12px 16px', borderRadius: '8px', border: '1px solid ' + (alert.severity === 'CRITICAL' ? 'rgba(220,38,38,0.2)' : alert.severity === 'HIGH' ? 'rgba(245,158,11,0.2)' : 'rgba(59,130,246,0.15)'), background: alert.severity === 'CRITICAL' ? 'rgba(220,38,38,0.02)' : alert.severity === 'HIGH' ? 'rgba(245,158,11,0.02)' : 'rgba(59,130,246,0.02)' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                <span style={{ fontSize: '10px', fontWeight: 800, padding: '2px 6px', borderRadius: '3px', background: alert.severity === 'CRITICAL' ? 'rgba(220,38,38,0.1)' : alert.severity === 'HIGH' ? 'rgba(245,158,11,0.1)' : 'rgba(59,130,246,0.1)', color: alert.severity === 'CRITICAL' ? '#dc2626' : alert.severity === 'HIGH' ? '#d97706' : '#3b82f6' }}>{alert.severity}</span>
+                                <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--mfr-text-muted)', textTransform: 'uppercase' }}>{alert.category}</span>
+                              </div>
+                              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--mfr-text-primary)' }}>{alert.title}</div>
+                              <div style={{ fontSize: '12px', color: 'var(--mfr-text-secondary)', marginTop: '4px', lineHeight: 1.5 }}>{alert.description}</div>
+                              <div style={{ fontSize: '11.5px', color: '#7c3aed', marginTop: '6px', fontWeight: 600 }}>→ {alert.recommendation}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {/* Trends */}
+                    {riskData.assessment.trends?.length > 0 && (
+                      <div>
+                        <h4 style={{ fontSize: '13px', fontWeight: 700, margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.03em', color: 'var(--mfr-text-muted)' }}>Trends</h4>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                          {riskData.assessment.trends.map((trend, i) => (
+                            <div key={i} style={{ padding: '12px', borderRadius: '8px', background: 'var(--mfr-bg-secondary)', border: '1px solid var(--mfr-border)' }}>
+                              <div style={{ fontSize: '11px', color: 'var(--mfr-text-muted)', fontWeight: 600 }}>{trend.metric}</div>
+                              <div style={{ fontSize: '16px', fontWeight: 800, color: trend.direction === 'UP' ? '#10b981' : trend.direction === 'DOWN' ? '#dc2626' : '#71717a', marginTop: 2 }}>
+                                {trend.direction === 'UP' ? '↑' : trend.direction === 'DOWN' ? '↓' : '→'} {trend.value}
+                              </div>
+                              <div style={{ fontSize: '11px', color: 'var(--mfr-text-secondary)', marginTop: 2 }}>{trend.interpretation}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {/* Compliance */}
+                    {riskData.assessment.complianceSummary && (
+                      <div style={{ padding: '16px', borderRadius: '8px', background: riskData.assessment.complianceSummary.status === 'COMPLIANT' ? 'rgba(16,185,129,0.04)' : 'rgba(245,158,11,0.04)', border: '1px solid ' + (riskData.assessment.complianceSummary.status === 'COMPLIANT' ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)') }}>
+                        <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <HiOutlineShieldCheck style={{ width: 14, height: 14, color: riskData.assessment.complianceSummary.status === 'COMPLIANT' ? '#10b981' : '#d97706' }} />
+                          Compliance: {riskData.assessment.complianceSummary.status}
+                        </div>
+                        {riskData.assessment.complianceSummary.issues?.length > 0 && (
+                          <ul style={{ margin: '6px 0 0', paddingLeft: '16px' }}>
+                            {riskData.assessment.complianceSummary.issues.map((issue, i) => (
+                              <li key={i} style={{ fontSize: '12px', color: 'var(--mfr-text-secondary)', marginBottom: '2px' }}>{issue}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                    {/* Footer */}
+                    <div style={{ textAlign: 'center', padding: '12px 0 0', borderTop: '1px solid var(--mfr-border)' }}>
+                      <span style={{ fontSize: '10.5px', color: 'var(--mfr-text-muted)' }}>
+                        Generated {new Date(riskData.generatedAt).toLocaleString()} • Analyzed {riskData.dataPoints?.products || 0} products, {riskData.dataPoints?.batches || 0} batches, {riskData.dataPoints?.scans || 0} scans
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--mfr-text-muted)' }}>
+                    <p>Failed to generate risk assessment. Please try again.</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -166,3 +166,52 @@ export async function negotiateSignalR() {
   return res.json();
 }
 
+// ═══ AI-Powered APIs ═══
+
+export async function aiAutofillProduct(medicineName) {
+  return authFetch('/ai/autofill-product', {
+    method: 'POST',
+    body: JSON.stringify({ medicineName })
+  });
+}
+
+export async function aiBatchAssist(batchContext) {
+  return authFetch('/ai/batch-assist', {
+    method: 'POST',
+    body: JSON.stringify(batchContext)
+  });
+}
+
+export async function aiDashboardInsights() {
+  return authFetch('/ai/insights');
+}
+
+export async function aiRiskAssessment() {
+  return authFetch('/ai/risk-assessment');
+}
+
+export async function aiCopilotChat(messages) {
+  return authFetch('/ai/copilot', {
+    method: 'POST',
+    body: JSON.stringify({ messages })
+  });
+}
+
+// Consumer-facing AI (no auth required)
+export async function aiDrugInteraction(medicines) {
+  const res = await fetch(`${API_BASE}/ai/drug-interaction`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ medicines })
+  });
+  if (!res.ok) {
+    let errMessage = 'Drug interaction check failed';
+    try {
+      const error = await res.json();
+      errMessage = error.error || errMessage;
+    } catch(e) { errMessage = `Server error (${res.status})`; }
+    throw new Error(errMessage);
+  }
+  return res.json();
+}
+
