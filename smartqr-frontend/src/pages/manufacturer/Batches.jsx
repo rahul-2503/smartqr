@@ -208,12 +208,12 @@ export default function Batches() {
   return (
     <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
       {/* Header */}
-      <div className="mfr-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+      <div className="mfr-page-header">
         <div>
           <h1>Batch Ledger</h1>
           <p style={{ fontSize: '13px' }}>{batches.length} active batch runs across {products.length} catalog products</p>
         </div>
-        <div className="mfr-page-header-actions" style={{ gap: '10px' }}>
+        <div className="mfr-page-header-actions">
           <Link to="/manufacturer/qr-center" className="mfr-btn mfr-btn-outline" style={{ background: '#ffffff' }}>
             <HiOutlineQrCode style={{ width: 15, height: 15 }} /> QR Center
           </Link>

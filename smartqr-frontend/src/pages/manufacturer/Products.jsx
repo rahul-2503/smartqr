@@ -164,7 +164,7 @@ export default function Products() {
   return (
     <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
       {/* Header */}
-      <div className="mfr-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+      <div className="mfr-page-header">
         <div>
           <h1>Product Catalog</h1>
           <p style={{ fontSize: '13px' }}>{products.length} registered product{products.length !== 1 ? 's' : ''} in organization registry</p>

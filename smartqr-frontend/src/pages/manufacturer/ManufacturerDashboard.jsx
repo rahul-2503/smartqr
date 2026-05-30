@@ -527,7 +527,7 @@ export default function ManufacturerDashboard() {
       </AnimatePresence>
 
       {/* Page Header */}
-      <div className="mfr-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+      <div className="mfr-page-header">
         <div>
           <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
             Welcome back, {organization?.name || 'Organization'}
@@ -577,7 +577,7 @@ export default function ManufacturerDashboard() {
             </div>
           </div>
         </div>
-        <div className="mfr-page-header-actions" style={{ gap: '12px' }}>
+        <div className="mfr-page-header-actions">
           <button onClick={loadRiskAssessment} className="mfr-btn mfr-btn-outline" style={{ background: '#ffffff', gap: '6px' }} id="risk-assessment-btn">
             <HiOutlineExclamationTriangle style={{ width: 15, height: 15, color: '#dc2626' }} /> AI Risk Report
           </button>

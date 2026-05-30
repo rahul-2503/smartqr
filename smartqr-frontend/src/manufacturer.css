@@ -868,6 +868,10 @@
 
 /* ═══ Page Header ═══ */
 .mfr-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
   margin-bottom: 32px;
 }
 
@@ -888,7 +892,8 @@
 .mfr-page-header-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 /* ═══ Dashboard Grid ═══ */
@@ -992,13 +997,69 @@
   }
   .mfr-page-header {
     flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  .mfr-page-header-actions {
+    width: 100%;
+    gap: 8px;
+  }
+  .mfr-page-header-actions .mfr-btn {
+    flex: 1;
+    min-width: 120px;
+  }
+}
+
+@media (max-width: 600px) {
+  .mfr-card-header {
+    flex-direction: column;
     align-items: flex-start;
     gap: 12px;
+  }
+  .mfr-card-header > div,
+  .mfr-card-header-actions {
+    width: 100%;
+  }
+  .mfr-card-header-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .mfr-card-header-actions .mfr-btn {
+    width: 100%;
   }
 }
 
 @media (max-width: 480px) {
   .mfr-stats-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .mfr-stat-card {
+    padding: 12px;
+  }
+  .mfr-stat-value {
+    font-size: 18px;
+  }
+  .mfr-stat-label {
+    font-size: 10.5px;
+    margin-top: 4px;
+  }
+  .mfr-stat-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+  }
+  .mfr-stat-icon svg {
+    width: 14px;
+    height: 14px;
+  }
+  .mfr-page-header-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .mfr-page-header-actions .mfr-btn {
+    width: 100%;
   }
 }
