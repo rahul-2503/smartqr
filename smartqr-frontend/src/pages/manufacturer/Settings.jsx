@@ -5,12 +5,13 @@ import {
   HiOutlineBuildingOffice2, HiOutlineUserGroup, HiOutlineExclamationTriangle,
   HiOutlineCheckCircle, HiOutlinePencilSquare, HiOutlineTrash,
   HiOutlineShieldCheck, HiOutlineArrowRightOnRectangle, HiOutlineArrowPathRoundedSquare,
-  HiOutlineExclamationCircle, HiOutlineUserMinus, HiOutlineChevronUpDown
+  HiOutlineExclamationCircle, HiOutlineUserMinus, HiOutlineChevronUpDown,
+  HiOutlineBell, HiOutlineEnvelope, HiOutlineArrowTopRightOnSquare
 } from 'react-icons/hi2';
 import { useAuth } from '../../context/AuthContext';
 import {
   updateOrganization, deleteOrganization,
-  updateMemberRole, removeMember
+  updateMemberRole, removeMember, triggerExpiryAlerts
 } from '../../api/manufacturerApi';
 import '../../manufacturer.css';
 
@@ -45,6 +46,10 @@ export default function Settings() {
 
   // Member management
   const [memberLoading, setMemberLoading] = useState(null); // uid of member being updated
+
+  // Alert settings states
+  const [alertLoading, setAlertLoading] = useState(false);
+  const [alertSuccess, setAlertSuccess] = useState(null);
 
   useEffect(() => {
     if (organization) {
@@ -133,6 +138,28 @@ export default function Settings() {
       showMsg(err.message || 'Failed to remove member', 'error');
     } finally {
       setMemberLoading(null);
+    }
+  };
+
+  // ═══ Trigger Alert Test ═══
+  const handleTriggerAlertTest = async () => {
+    setAlertLoading(true);
+    setAlertSuccess(null);
+    try {
+      const res = await triggerExpiryAlerts();
+      if (res.success) {
+        setAlertSuccess({
+          message: res.message,
+          previewUrl: res.previewUrl,
+          isEthereal: res.isEthereal,
+          recipients: res.recipients
+        });
+        showMsg(res.message);
+      }
+    } catch (err) {
+      showMsg(err.message || 'Failed to trigger alert test', 'error');
+    } finally {
+      setAlertLoading(false);
     }
   };
 
@@ -439,6 +466,107 @@ export default function Settings() {
                 </table>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* ═══ Section 2.5: Alert & Notification Settings ═══ */}
+        <div className="mfr-card">
+          <div className="mfr-card-header" style={{ padding: '20px 24px' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+              <HiOutlineBell style={{ width: 18, height: 18, color: 'var(--mfr-text-secondary)' }} />
+              Alert & Notification Settings
+            </h3>
+          </div>
+          <div className="mfr-card-body" style={{ padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+              <div style={{ flex: '1 1 350px' }}>
+                <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--mfr-text-primary)', marginBottom: '4px' }}>
+                  Automated Batch Expiry Notifications
+                </div>
+                <div style={{ fontSize: '12.5px', color: 'var(--mfr-text-muted)', lineHeight: 1.5 }}>
+                  The system scans all batch runs daily and automatically dispatches warning reports to all workspace members when products approach expiration. Warning stages are categorized as:
+                  <ul style={{ margin: '8px 0 0 16px', padding: 0, fontSize: '12px' }}>
+                    <li style={{ marginBottom: '4px' }}><strong style={{ color: '#dc2626' }}>Critical Warning</strong>: 10 days or less before expiration</li>
+                    <li style={{ marginBottom: '4px' }}><strong style={{ color: '#ea580c' }}>Urgent Warning</strong>: 11 to 15 days before expiration</li>
+                    <li style={{ marginBottom: '4px' }}><strong style={{ color: '#eab308' }}>Standard Warning</strong>: 16 to 30 days before expiration</li>
+                  </ul>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-end', flexShrink: 0 }}>
+                <button
+                  onClick={handleTriggerAlertTest}
+                  disabled={alertLoading}
+                  className="mfr-btn mfr-btn-outline"
+                  style={{
+                    background: '#ffffff', fontWeight: 600, gap: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center'
+                  }}
+                  id="test-expiry-alert-btn"
+                >
+                  {alertLoading ? (
+                    <><div className="mfr-spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> Dispatching...</>
+                  ) : (
+                    <><HiOutlineEnvelope style={{ width: 15, height: 15 }} /> Send Test Expiry Alert</>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Test Email Preview Container */}
+            <AnimatePresence>
+              {alertSuccess && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  style={{
+                    marginTop: '20px',
+                    padding: '16px',
+                    background: 'rgba(16,185,129,0.05)',
+                    border: '1px solid rgba(16,185,129,0.15)',
+                    borderRadius: 'var(--mfr-radius-md)',
+                    overflow: 'hidden'
+                  }}
+                >
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#059669', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <HiOutlineCheckCircle style={{ width: 16, height: 16 }} />
+                    Alert Email Dispatched Successfully!
+                  </div>
+                  <div style={{ fontSize: '12.5px', color: 'var(--mfr-text-secondary)', marginTop: '8px', lineHeight: 1.5 }}>
+                    {alertSuccess.message}
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--mfr-text-muted)', marginTop: '4px' }}>
+                    Recipients: <strong>{alertSuccess.recipients.join(', ')}</strong>
+                  </div>
+                  {alertSuccess.isEthereal && alertSuccess.previewUrl && (
+                    <div style={{ marginTop: '12px' }}>
+                      <a
+                        href={alertSuccess.previewUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: 'white',
+                          color: '#059669',
+                          border: '1px solid rgba(16,185,129,0.25)',
+                          borderRadius: '6px',
+                          padding: '6px 12px',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          textDecoration: 'none',
+                          cursor: 'pointer',
+                          boxShadow: 'var(--mfr-shadow-sm)'
+                        }}
+                      >
+                        <HiOutlineArrowTopRightOnSquare style={{ width: 14, height: 14 }} />
+                        View Rendered Test Email in Browser
+                      </a>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 

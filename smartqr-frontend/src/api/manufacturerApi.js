@@ -243,3 +243,10 @@ export async function removeMember(uid) {
   });
 }
 
+export async function triggerExpiryAlerts() {
+  return authFetch('/triggerExpiryAlerts', {
+    method: 'POST'
+  });
+}
+
+
