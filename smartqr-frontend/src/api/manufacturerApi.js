@@ -215,3 +215,31 @@ export async function aiDrugInteraction(medicines) {
   return res.json();
 }
 
+// ═══ Organization Management APIs ═══
+
+export async function updateOrganization(orgData) {
+  return authFetch('/updateOrganization', {
+    method: 'PUT',
+    body: JSON.stringify(orgData)
+  });
+}
+
+export async function deleteOrganization() {
+  return authFetch('/deleteOrganization', {
+    method: 'DELETE'
+  });
+}
+
+export async function updateMemberRole(targetUid, newRole) {
+  return authFetch('/updateMemberRole', {
+    method: 'PUT',
+    body: JSON.stringify({ targetUid, newRole })
+  });
+}
+
+export async function removeMember(uid) {
+  return authFetch(`/removeMember/${uid}`, {
+    method: 'DELETE'
+  });
+}
+

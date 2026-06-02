@@ -9,9 +9,11 @@ import {
   HiOutlineExclamationTriangle, HiOutlineSparkles
 } from 'react-icons/hi2';
 import { getOrgProducts, registerBatch, updateBatch, deleteBatch, aiBatchAssist } from '../../api/manufacturerApi';
+import { useAuth } from '../../context/AuthContext';
 import '../../manufacturer.css';
 
 export default function Batches() {
+  const { isOwner } = useAuth();
   const [products, setProducts] = useState([]);
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -692,18 +694,20 @@ export default function Batches() {
                             >
                               <HiOutlinePencilSquare style={{ width: 12, height: 12 }} /> Edit
                             </button>
-                            <button
-                              onClick={() => setDeleteConfirm(b)}
-                              className="mfr-btn mfr-btn-sm"
-                              title="Delete batch"
-                              style={{ 
-                                padding: '4px 7px', fontSize: '11px', background: 'rgba(239,68,68,0.06)', 
-                                color: '#ef4444', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 'var(--mfr-radius-sm)',
-                                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 600
-                              }}
-                            >
-                              <HiOutlineTrash style={{ width: 12, height: 12 }} />
-                            </button>
+                            {isOwner && (
+                              <button
+                                onClick={() => setDeleteConfirm(b)}
+                                className="mfr-btn mfr-btn-sm"
+                                title="Delete batch"
+                                style={{ 
+                                  padding: '4px 7px', fontSize: '11px', background: 'rgba(239,68,68,0.06)', 
+                                  color: '#ef4444', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 'var(--mfr-radius-sm)',
+                                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 600
+                                }}
+                              >
+                                <HiOutlineTrash style={{ width: 12, height: 12 }} />
+                              </button>
+                            )}
                             <Link 
                               to={`/manufacturer/qr-center?batch=${b.batch_id}&product=${b.product_id}`}
                               className="mfr-btn mfr-btn-sm mfr-btn-outline"

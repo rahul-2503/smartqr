@@ -19,6 +19,7 @@ import ManufacturerDashboard from './pages/manufacturer/ManufacturerDashboard';
 import Products from './pages/manufacturer/Products';
 import Batches from './pages/manufacturer/Batches';
 import QRCenter from './pages/manufacturer/QRCenter';
+import Settings from './pages/manufacturer/Settings';
 
 function AppRoutes() {
   return (
@@ -47,6 +48,7 @@ function AppRoutes() {
         <Route path="products" element={<Products />} />
         <Route path="batches" element={<Batches />} />
         <Route path="qr-center" element={<QRCenter />} />
+        <Route path="settings" element={<Settings />} />
         
         {/* Default redirect */}
         <Route index element={<Navigate to="dashboard" replace />} />

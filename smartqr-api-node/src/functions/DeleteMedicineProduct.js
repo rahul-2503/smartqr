@@ -1,6 +1,6 @@
 const { app } = require('@azure/functions');
 const { getContainers } = require('../db');
-const { verifyToken } = require('../utils/auth');
+const { verifyToken, verifyRole } = require('../utils/auth');
 
 app.http('DeleteMedicineProduct', {
     methods: ['DELETE'],
@@ -17,6 +17,14 @@ app.http('DeleteMedicineProduct', {
             }
 
             const productId = request.params.productId;
+
+            // Verify owner role — only owners can delete products
+            try {
+                await verifyRole(authUser, 'owner');
+            } catch (roleErr) {
+                return { status: roleErr.statusCode || 403, jsonBody: { error: roleErr.message } };
+            }
+
             const { medicineProducts, smartBatches, auditLogs } = await getContainers();
 
             // Find and verify ownership

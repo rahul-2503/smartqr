@@ -5,7 +5,7 @@ import {
   HiOutlineSquares2X2, HiOutlineCube, HiOutlineArchiveBox,
   HiOutlineQrCode, HiOutlineArrowRightOnRectangle,
   HiOutlineShieldCheck, HiOutlineBars3, HiOutlineXMark,
-  HiOutlineSparkles
+  HiOutlineSparkles, HiOutlineCog6Tooth
 } from 'react-icons/hi2';
 import { useAuth } from '../../context/AuthContext';
 import AiCopilot from '../AiCopilot';
@@ -16,11 +16,12 @@ const NAV_ITEMS = [
   { path: '/manufacturer/products', label: 'Products', icon: HiOutlineCube },
   { path: '/manufacturer/batches', label: 'Batches', icon: HiOutlineArchiveBox },
   { path: '/manufacturer/qr-center', label: 'QR Center', icon: HiOutlineQrCode },
+  { path: '/manufacturer/settings', label: 'Settings', icon: HiOutlineCog6Tooth },
 ];
 
 export default function ManufacturerLayout() {
   const location = useLocation();
-  const { user, organization, loading, logout } = useAuth();
+  const { user, organization, loading, logout, userRole, isOwner } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const isAuthPage = location.pathname.includes('/login') || location.pathname.includes('/register');
@@ -147,6 +148,14 @@ export default function ManufacturerLayout() {
             <div className="mfr-sidebar-org-badge">
               <HiOutlineShieldCheck style={{ width: 12, height: 12 }} />
               Verified Organization
+            </div>
+            <div style={{
+              marginTop: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px',
+              padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 700,
+              background: isOwner ? 'rgba(16,185,129,0.08)' : 'rgba(59,130,246,0.08)',
+              color: isOwner ? '#059669' : '#2563eb'
+            }}>
+              {isOwner ? 'Owner' : 'Employee'}
             </div>
           </div>
           <button 

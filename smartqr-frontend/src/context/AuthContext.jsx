@@ -27,6 +27,7 @@ function isBusinessEmail(email) {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [organization, setOrganization] = useState(null);
+  const [userRole, setUserRole] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
 
@@ -40,12 +41,15 @@ export function AuthProvider({ children }) {
       if (res.ok) {
         const data = await res.json();
         setOrganization(data.organization);
+        setUserRole(data.role || 'employee');
       } else {
         setOrganization(null);
+        setUserRole(null);
       }
     } catch (err) {
       console.error('Failed to fetch organization:', err);
       setOrganization(null);
+      setUserRole(null);
     }
   };
 
@@ -56,6 +60,7 @@ export function AuthProvider({ children }) {
         await fetchOrganization(firebaseUser);
       } else {
         setOrganization(null);
+        setUserRole(null);
       }
       setLoading(false);
     });
@@ -120,6 +125,7 @@ export function AuthProvider({ children }) {
       
       const data = await res.json();
       setOrganization(data.organization);
+      setUserRole(data.role || 'owner');
       return cred.user;
     } catch (err) {
       if (err.code === 'auth/email-already-in-use') {
@@ -135,6 +141,7 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     await signOut(auth);
     setOrganization(null);
+    setUserRole(null);
   };
 
   const refreshOrg = async () => {
@@ -145,6 +152,8 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{
       user,
       organization,
+      userRole,
+      isOwner: userRole === 'owner',
       loading,
       authError,
       login,

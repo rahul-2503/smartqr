@@ -22,7 +22,7 @@ import Chart from 'chart.js/auto';
 import '../../manufacturer.css';
 
 export default function ManufacturerDashboard() {
-  const { organization, user } = useAuth();
+  const { organization, user, isOwner } = useAuth();
   const [products, setProducts] = useState([]);
   const [batches, setBatches] = useState([]);
   const [auditLogs, setAuditLogsList] = useState([]);
@@ -535,7 +535,7 @@ export default function ManufacturerDashboard() {
           </h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
             <p style={{ fontSize: '13px', margin: 0, color: 'var(--mfr-text-muted)' }}>
-              Workspace Administrator • {user?.email}
+              {isOwner ? 'Workspace Owner' : 'Workspace Member'} • {user?.email}
             </p>
             <span style={{ color: '#d4d4d8' }}>•</span>
             {/* Realtime / Polling pill indicator */}

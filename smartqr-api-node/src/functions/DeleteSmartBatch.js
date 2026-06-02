@@ -1,6 +1,6 @@
 const { app } = require('@azure/functions');
 const { getContainers } = require('../db');
-const { verifyToken } = require('../utils/auth');
+const { verifyToken, verifyRole } = require('../utils/auth');
 
 app.http('DeleteSmartBatch', {
     methods: ['DELETE'],
@@ -17,6 +17,14 @@ app.http('DeleteSmartBatch', {
             }
 
             const batchId = request.params.batchId;
+
+            // Verify owner role — only owners can delete batches
+            try {
+                await verifyRole(authUser, 'owner');
+            } catch (roleErr) {
+                return { status: roleErr.statusCode || 403, jsonBody: { error: roleErr.message } };
+            }
+
             const { smartBatches, auditLogs } = await getContainers();
 
             // Find existing batch owned by this org

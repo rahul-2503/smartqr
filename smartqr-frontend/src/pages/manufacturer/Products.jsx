@@ -8,9 +8,11 @@ import {
   HiOutlineSparkles
 } from 'react-icons/hi2';
 import { getOrgProducts, registerProduct, updateProduct, deleteProduct, aiAutofillProduct } from '../../api/manufacturerApi';
+import { useAuth } from '../../context/AuthContext';
 import '../../manufacturer.css';
 
 export default function Products() {
+  const { isOwner } = useAuth();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -597,18 +599,20 @@ export default function Products() {
                             >
                               <HiOutlinePencilSquare style={{ width: 13, height: 13 }} /> Edit
                             </button>
-                            <button
-                              onClick={() => setDeleteConfirm(p)}
-                              className="mfr-btn mfr-btn-sm"
-                              title="Delete product"
-                              style={{ 
-                                padding: '4px 8px', fontSize: '11px', background: 'rgba(239,68,68,0.06)', 
-                                color: '#ef4444', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 'var(--mfr-radius-sm)',
-                                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600
-                              }}
-                            >
-                              <HiOutlineTrash style={{ width: 13, height: 13 }} /> Delete
-                            </button>
+                            {isOwner && (
+                              <button
+                                onClick={() => setDeleteConfirm(p)}
+                                className="mfr-btn mfr-btn-sm"
+                                title="Delete product"
+                                style={{ 
+                                  padding: '4px 8px', fontSize: '11px', background: 'rgba(239,68,68,0.06)', 
+                                  color: '#ef4444', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 'var(--mfr-radius-sm)',
+                                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600
+                                }}
+                              >
+                                <HiOutlineTrash style={{ width: 13, height: 13 }} /> Delete
+                              </button>
+                            )}
                           </div>
                         </td>
                       </motion.tr>

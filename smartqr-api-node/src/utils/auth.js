@@ -89,8 +89,68 @@ async function verifyToken(authHeader) {
   }
 }
 
+/**
+ * Verifies the user's role within their organization.
+ * Looks up the organization's members array to determine the user's role.
+ * Auto-migrates legacy orgs (without members array) by assigning the creator as owner.
+ * 
+ * @param {object} authUser - The authenticated user object from verifyToken()
+ * @param {string} requiredRole - Minimum role required: 'employee' (any member) or 'owner'
+ * @returns {Promise<object>} { role, organization }
+ * @throws {Error} 403 if user lacks required role, 404 if org not found
+ */
+async function verifyRole(authUser, requiredRole = 'employee') {
+  const { getContainers } = require('../db');
+  const { organizations } = await getContainers();
+  const domain = authUser.organizationDomain;
+
+  let org;
+  try {
+    const { resource } = await organizations.item(domain, domain).read();
+    org = resource;
+  } catch (e) {
+    // org not found
+  }
+
+  if (!org) {
+    const err = new Error('Organization not found. Please complete registration.');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  // Auto-migrate legacy orgs that don't have a members array
+  if (!org.members || !Array.isArray(org.members)) {
+    org.members = [{
+      uid: org.createdBy,
+      email: org.createdByEmail,
+      role: 'owner',
+      joinedAt: org.createdAt || new Date().toISOString()
+    }];
+    await organizations.items.upsert(org);
+  }
+
+  // Find user in members array
+  const member = org.members.find(m => m.uid === authUser.uid || m.email === authUser.email);
+
+  if (!member) {
+    const err = new Error('You are not a member of this organization.');
+    err.statusCode = 403;
+    throw err;
+  }
+
+  // Check role hierarchy: owner > employee
+  if (requiredRole === 'owner' && member.role !== 'owner') {
+    const err = new Error('This action requires owner privileges.');
+    err.statusCode = 403;
+    throw err;
+  }
+
+  return { role: member.role, organization: org };
+}
+
 module.exports = {
   verifyToken,
+  verifyRole,
   extractOrgDomain,
   isBusinessEmail,
   deriveOrgName,
