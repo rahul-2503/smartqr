@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Html5Qrcode } from 'html5-qrcode';
 import Tesseract from 'tesseract.js';
 import jsQR from 'jsqr';
+import * as tf from '@tensorflow/tfjs';
+import * as mobilenet from '@tensorflow-models/mobilenet';
 import { getProductByBarcode } from '../api/products';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useNavigate } from 'react-router-dom';
@@ -53,6 +55,10 @@ export default function Scanner() {
   // Gallery upload state
   const [isUploadProcessing, setIsUploadProcessing] = useState(false);
   
+  // ML Object Classifier State
+  const [isModelLoading, setIsModelLoading] = useState(false);
+  const [classifierResult, setClassifierResult] = useState(null);
+  
   // New OCR Camera Management State
   const [ocrCameras, setOcrCameras] = useState([]);
   const [ocrSelectedCamera, setOcrSelectedCamera] = useState('');
@@ -63,6 +69,9 @@ export default function Scanner() {
   const canvasRef = useRef(null);
   const ocrStreamRef = useRef(null);
   const fileInputRef = useRef(null);
+  
+  const mobilenetModelRef = useRef(null);
+  const classificationIntervalRef = useRef(null);
 
   // --- Step 1: Barcode Scanner ---
   const startBarcodeScanner = async () => {
@@ -550,12 +559,143 @@ export default function Scanner() {
     navigate(`/scan/${matchedBatch.batch_id}`);
   };
 
+  // Load TensorFlow.js MobileNet model on mount
+  useEffect(() => {
+    let isMounted = true;
+    const loadModel = async () => {
+      if (mobilenetModelRef.current) return;
+      setIsModelLoading(true);
+      try {
+        console.log('[TFJS] Initializing TensorFlow.js...');
+        await tf.ready();
+        console.log('[TFJS] Loading MobileNet model...');
+        const model = await mobilenet.load({
+          version: 1,
+          alpha: 1.0
+        });
+        if (isMounted) {
+          mobilenetModelRef.current = model;
+          console.log('[TFJS] MobileNet model loaded successfully');
+        }
+      } catch (err) {
+        console.error('[TFJS] Error loading MobileNet model:', err);
+      } finally {
+        if (isMounted) {
+          setIsModelLoading(false);
+        }
+      }
+    };
+    loadModel();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Run real-time classification inference loop on active barcode scanner video feed
+  useEffect(() => {
+    if (!scanning) {
+      if (classificationIntervalRef.current) {
+        clearInterval(classificationIntervalRef.current);
+        classificationIntervalRef.current = null;
+      }
+      setClassifierResult(null);
+      return;
+    }
+
+    const runClassification = async () => {
+      if (!mobilenetModelRef.current) {
+        return;
+      }
+
+      try {
+        const video = document.querySelector('#qr-reader video');
+        if (video && video.readyState === video.HAVE_ENOUGH_DATA) {
+          const predictions = await mobilenetModelRef.current.classify(video);
+          if (predictions && predictions.length > 0) {
+            const topMatch = predictions[0];
+            const rawLabel = topMatch.className.toLowerCase();
+            let mappedLabel = 'Scanning Object...';
+            let mappedCategory = 'unknown';
+
+            if (
+              rawLabel.includes('pill') || 
+              rawLabel.includes('tablet') || 
+              rawLabel.includes('capsule') || 
+              rawLabel.includes('packet') ||
+              rawLabel.includes('envelope')
+            ) {
+              mappedLabel = 'Pill / Tablet Strip';
+              mappedCategory = 'pill';
+            } else if (
+              rawLabel.includes('bottle') || 
+              rawLabel.includes('flask') || 
+              rawLabel.includes('medicine') || 
+              rawLabel.includes('vial') || 
+              rawLabel.includes('perfume') || 
+              rawLabel.includes('cosmetic')
+            ) {
+              mappedLabel = 'Medicine Bottle / Syrup';
+              mappedCategory = 'bottle';
+            } else if (
+              rawLabel.includes('carton') || 
+              rawLabel.includes('box') || 
+              rawLabel.includes('package') || 
+              rawLabel.includes('container')
+            ) {
+              mappedLabel = 'Medicine Carton / Box';
+              mappedCategory = 'box';
+            } else if (
+              rawLabel.includes('syringe') || 
+              rawLabel.includes('needle') || 
+              rawLabel.includes('injector')
+            ) {
+              mappedLabel = 'Syringe / Injector';
+              mappedCategory = 'syringe';
+            } else {
+              const labelParts = topMatch.className.split(',');
+              const primaryName = labelParts[0].trim();
+              mappedLabel = primaryName.replace(/\b\w/g, c => c.toUpperCase());
+              mappedCategory = 'other';
+            }
+
+            setClassifierResult({
+              label: mappedLabel,
+              rawLabel: topMatch.className,
+              confidence: Math.round(topMatch.probability * 100),
+              category: mappedCategory
+            });
+          }
+        }
+      } catch (err) {
+        console.error('[TFJS] Inference error:', err);
+      }
+    };
+
+    classificationIntervalRef.current = setInterval(runClassification, 800);
+
+    return () => {
+      if (classificationIntervalRef.current) {
+        clearInterval(classificationIntervalRef.current);
+        classificationIntervalRef.current = null;
+      }
+    };
+  }, [scanning]);
+
   const resetAll = () => {
     stopBarcodeScanner(); stopOcrCamera();
     setStep('BARCODE'); setProduct(null); setBatches([]); setResolvedBatch(null); setOcrText('');
+    setClassifierResult(null);
   };
 
-  useEffect(() => { return () => { stopBarcodeScanner(); stopOcrCamera(); }; }, []);
+  useEffect(() => { 
+    return () => { 
+      stopBarcodeScanner(); 
+      stopOcrCamera(); 
+      if (classificationIntervalRef.current) {
+        clearInterval(classificationIntervalRef.current);
+      }
+    }; 
+  }, []);
 
   const st = resolvedBatch ? STATUS[resolvedBatch.status] : null;
 
@@ -670,6 +810,63 @@ export default function Scanner() {
                 <div>
                   <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 16, background: 'black' }}>
                     <div id="qr-reader" style={{ width: '100%', border: 'none' }}></div>
+                    
+                    {/* Live AI Classifier Overlay */}
+                    {classifierResult && (
+                      <div style={{
+                        position: 'absolute',
+                        bottom: 16,
+                        left: 16,
+                        right: 16,
+                        background: 'rgba(26, 26, 46, 0.85)',
+                        backdropFilter: 'blur(8px)',
+                        borderRadius: 12,
+                        padding: '12px 16px',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        zIndex: 10,
+                        color: 'white',
+                        textAlign: 'left'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#48bb78', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#48bb78', display: 'inline-block', animation: 'pulse 1.5s infinite' }} />
+                            AI Object Detector
+                          </span>
+                          <span style={{ fontSize: 11, color: '#a0aec0' }}>MobileNet v1</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                          <h4 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>{classifierResult.label}</h4>
+                          <span style={{ fontSize: 14, fontWeight: 700, color: '#48bb78' }}>{classifierResult.confidence}%</span>
+                        </div>
+                        <div style={{ height: 4, width: '100%', background: 'rgba(255,255,255,0.1)', borderRadius: 2, marginTop: 8, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${classifierResult.confidence}%`, background: '#48bb78', borderRadius: 2, transition: 'width 0.3s ease' }} />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Model Loading State */}
+                    {isModelLoading && (
+                      <div style={{
+                        position: 'absolute',
+                        top: 16,
+                        right: 16,
+                        background: 'rgba(26, 26, 46, 0.85)',
+                        backdropFilter: 'blur(8px)',
+                        borderRadius: 20,
+                        padding: '6px 12px',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        zIndex: 10,
+                        color: 'white',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6
+                      }}>
+                        <div style={{ width: 10, height: 10, border: '2px solid rgba(255,255,255,0.2)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />
+                        Loading AI model...
+                      </div>
+                    )}
                   </div>
                   <button onClick={stopBarcodeScanner} style={{ width: '100%', padding: '16px', background: '#f8f9fa', color: '#1a1a2e', fontWeight: 600, borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 16, marginTop: 16, fontFamily: 'inherit' }}>
                     {t('scanner.cancel')}
